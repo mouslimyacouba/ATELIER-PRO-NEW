@@ -78,7 +78,7 @@ GoRouter buildRouter(BuildContext context) {
           GoRoute(
             path: '/clients/:clientId',
             builder: (context, state) =>
-                ClientDetailScreen(clientId: state.pathParameters['clientId']!),
+                ClientDetailScreen(clientId: state.pathParameters['clientId'] ?? ''),
           ),
           GoRoute(
               path: '/commandes',
@@ -91,7 +91,7 @@ GoRouter buildRouter(BuildContext context) {
           GoRoute(
             path: '/commandes/:orderId',
             builder: (context, state) =>
-                OrderDetailScreen(orderId: state.pathParameters['orderId']!),
+                OrderDetailScreen(orderId: state.pathParameters['orderId'] ?? ''),
           ),
           GoRoute(
               path: '/mesures',

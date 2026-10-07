@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/order.dart';
-import '../models/order.dart'; // duplicate, removing in next step
 
 /// Rappels locaux de livraison. Aucun serveur impliqué : chaque appareil
 /// planifie ses propres notifications via le système d'exploitation, donc
@@ -132,30 +131,36 @@ class NotificationService {
       return o.dateEcheance!.isBefore(todayOnly);
     }).toList();
 
-    // Notification immédiate pour les commandes en retard
+    // Notification immédiate pour les commandes en retard avec déduplication journalière
     if (enRetard.isNotEmpty) {
-      if (enRetard.length == 1) {
-        final o = enRetard.first;
-        final client = o.clientName ?? 'un client';
-        final jours = todayOnly.difference(DateTime(
-          o.dateEcheance!.year,
-          o.dateEcheance!.month,
-          o.dateEcheance!.day,
-        )).inDays;
-        await _plugin.show(
-          _idRetard(o.id),
-          '⚠️ Commande en retard — ${o.numeroFormate}',
-          '$client attend "${o.description}" depuis $jours jour${jours > 1 ? 's' : ''}.',
-          _detailsRetard,
-        );
-      } else {
-        // Plusieurs retards — une seule notification groupée
-        await _plugin.show(
-          0xDEAD, // id fixe pour la notification groupée retards
-          '⚠️ ${enRetard.length} commandes en retard',
-          enRetard.map((o) => o.clientName ?? o.description).join(', '),
-          _detailsRetard,
-        );
+      final todayKey = 'notif_retard_${todayOnly.toIso8601String().substring(0, 10)}';
+      final alreadySentToday = prefs.getBool(todayKey) ?? false;
+
+      if (!alreadySentToday) {
+        if (enRetard.length == 1) {
+          final o = enRetard.first;
+          final client = o.clientName ?? 'un client';
+          final jours = todayOnly.difference(DateTime(
+            o.dateEcheance!.year,
+            o.dateEcheance!.month,
+            o.dateEcheance!.day,
+          )).inDays;
+          await _plugin.show(
+            _idRetard(o.id),
+            '⚠️ Commande en retard — ${o.numeroFormate}',
+            '$client attend "${o.description}" depuis $jours jour${jours > 1 ? 's' : ''}.',
+            _detailsRetard,
+          );
+        } else {
+          // Plusieurs retards — une seule notification groupée
+          await _plugin.show(
+            0xDEAD, // id fixe pour la notification groupée retards
+            '⚠️ ${enRetard.length} commandes en retard',
+            enRetard.map((o) => o.clientName ?? o.description).join(', '),
+            _detailsRetard,
+          );
+        }
+        await prefs.setBool(todayKey, true);
       }
     }
 

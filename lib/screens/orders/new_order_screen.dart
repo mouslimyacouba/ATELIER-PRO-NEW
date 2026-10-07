@@ -125,22 +125,26 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       List<String> modelMateriaux = [];
 
       if (_modeleId != null) {
-        final modele = context
+        final matches = context
             .read<ModelesProvider>()
             .tousLesModeles
-            .firstWhere((m) => m.id == _modeleId);
+            .where((m) => m.id == _modeleId)
+            .toList();
 
-        int ordre = 1;
-        modelMateriaux = modele.materiauxDefaut;
+        if (matches.isNotEmpty) {
+          final modele = matches.first;
+          int ordre = 1;
+          modelMateriaux = modele.materiauxDefaut;
 
-        etapesSnapshot = modele.etapes.map((e) {
-          return {
-            'id': e.id,
-            'ordre': ordre++,
-            'titre': e.titre,
-            'terminee': false,
-          };
-        }).toList();
+          etapesSnapshot = modele.etapes.map((e) {
+            return {
+              'id': e.id,
+              'ordre': ordre++,
+              'titre': e.titre,
+              'terminee': false,
+            };
+          }).toList();
+        }
       }
 
       final result = await context.read<OrdersProvider>().createOrder(

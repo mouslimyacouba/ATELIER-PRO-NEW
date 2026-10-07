@@ -37,7 +37,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
   }
 
   Future<void> _openForm({AtelierClient? existing}) async {
-    final userId = context.read<AtelierProvider>().atelier!.userId;
+    final atelier = context.read<AtelierProvider>().atelier;
+    if (atelier == null) return;
+    final userId = atelier.userId;
     final nameCtrl = TextEditingController(text: existing?.nomComplet ?? '');
     final phoneCtrl = TextEditingController(text: existing?.telephone ?? '');
     final addressCtrl = TextEditingController(text: existing?.adresse ?? '');

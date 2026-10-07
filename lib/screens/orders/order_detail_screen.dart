@@ -164,6 +164,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   validator: (v) {
                     final n = double.tryParse((v ?? '').replaceAll(',', '.'));
                     if (n == null || n <= 0) return 'Montant invalide';
+                    if (n > order.remaining) {
+                      return 'Le montant dépasse le solde restant (${_money.format(order.remaining)})';
+                    }
                     return null;
                   },
                 ),

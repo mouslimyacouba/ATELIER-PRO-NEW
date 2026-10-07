@@ -8,8 +8,6 @@ import '../models/payment.dart';
 import '../models/historique_entry.dart';
 import '../core/notification_service.dart';
 import 'stock_provider.dart';
-import 'modeles_provider.dart';
-import 'package:provider/provider.dart';
 
 class OrdersProvider extends ChangeNotifier {
   final _firestore = FirebaseFirestore.instance;
@@ -184,36 +182,63 @@ class OrdersProvider extends ChangeNotifier {
       final docRef = _firestore.collection('commandes').doc();
       final compteurRef = _firestore.collection('compteurs').doc(order.userId);
 
-      // Utilisation de runTransaction() sur tous les supports (Web inclus).
-      // cloud_firestore ^5.x supporte les transactions Web — la branche
-      // kIsWeb séquentielle était obsolète et présentait deux risques :
-      // 1. Non-atomicité : compteur incrémenté même si l'écriture commande échoue.
-      // 2. Sur Flutter Web, les deux .set() séquentiels pouvaient déclencher
-      //    une FirebaseException selon le contexte de sérialisation JS.
-      await _firestore.runTransaction((transaction) async {
-        final compteurSnap = await transaction.get(compteurRef);
+      // Calcul local du prochain numéro (fallback si offline ou si transaction échoue)
+      final maxNumeroActuel = _orders.fold<int>(
+        0,
+        (maxVal, o) => (o.numero ?? 0) > maxVal ? (o.numero ?? 0) : maxVal,
+      );
+      final nouveauNumeroLocal = maxNumeroActuel + 1;
 
-        int nouveauNumero = 1;
+      bool transactionSuccess = false;
 
-        if (compteurSnap.exists && compteurSnap.data() != null) {
-          nouveauNumero =
-              (compteurSnap.data()!['dernierNumero'] as num? ?? 0).toInt() + 1;
-        }
+      // En ligne : tentative via transaction serveur (timeout court de 3s si réseau instable)
+      try {
+        await _firestore.runTransaction((transaction) async {
+          final compteurSnap = await transaction.get(compteurRef);
 
+          int nouveauNumero = nouveauNumeroLocal;
+
+          if (compteurSnap.exists && compteurSnap.data() != null) {
+            final dernier = (compteurSnap.data()!['dernierNumero'] as num? ?? 0).toInt();
+            nouveauNumero = (dernier >= maxNumeroActuel ? dernier : maxNumeroActuel) + 1;
+          }
+
+          final map = order.toInsertMap();
+          map['numero'] = nouveauNumero;
+
+          transaction.set(
+            compteurRef,
+            {
+              'dernierNumero': nouveauNumero,
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true),
+          );
+
+          transaction.set(docRef, map);
+        }).timeout(const Duration(seconds: 3));
+        transactionSuccess = true;
+      } catch (e) {
+        debugPrint('Mode hors-ligne ou réseau instable ($e) : bascule sur écriture locale Firestore...');
+      }
+
+      if (!transactionSuccess) {
+        // Mode Hors-Ligne (Offline-First) : écriture directe en cache local Firestore
         final map = order.toInsertMap();
-        map['numero'] = nouveauNumero;
+        map['numero'] = nouveauNumeroLocal;
 
-        transaction.set(
+        final batch = _firestore.batch();
+        batch.set(docRef, map);
+        batch.set(
           compteurRef,
           {
-            'dernierNumero': nouveauNumero,
+            'dernierNumero': nouveauNumeroLocal,
             'updatedAt': FieldValue.serverTimestamp(),
           },
           SetOptions(merge: true),
         );
-
-        transaction.set(docRef, map);
-      });
+        await batch.commit();
+      }
 
       if (stockProvider != null &&
           materiauxDefaut != null &&
@@ -422,7 +447,14 @@ class OrdersProvider extends ChangeNotifier {
     required String mode,
   }) async {
     try {
+      if (amount <= 0) {
+        return 'Le montant du paiement doit être supérieur à zéro.';
+      }
       final order = byId(orderId);
+      if (order != null && amount > order.remaining) {
+        return 'Le montant (${amount.toStringAsFixed(0)} FCFA) dépasse le solde restant (${order.remaining.toStringAsFixed(0)} FCFA).';
+      }
+
       final paymentRef = _firestore.collection('paiements').doc();
       final orderRef = _firestore.collection('commandes').doc(orderId);
 
