@@ -164,11 +164,10 @@ class AuthProvider extends ChangeNotifier {
   Future<(String?, bool)> signInWithGoogle() async {
     try {
       _error = null;
-      // On récupère le Client ID Web depuis l'environnement. Nécessaire pour
-      // le Web et recommandé sur Android quand le plugin google-services
-      // n'est pas utilisé (pour éviter les erreurs 10 ou 12500).
+      // Sur Web, on utilise explicitement le Client ID Web.
+      // Sur Android / iOS, on utilise la configuration native (google-services.json / plist).
       final clientId = dotenv.env['FIREBASE_WEB_CLIENT_ID'];
-      final googleSignIn = GoogleSignIn(clientId: clientId);
+      final googleSignIn = kIsWeb ? GoogleSignIn(clientId: clientId) : GoogleSignIn();
 
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
@@ -190,6 +189,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return (_error, false);
     } catch (e) {
+      debugPrint('[AuthProvider] Google Sign-In Exception: $e');
       return (
         'Connexion Google impossible. Vérifie ta configuration Firebase.',
         false

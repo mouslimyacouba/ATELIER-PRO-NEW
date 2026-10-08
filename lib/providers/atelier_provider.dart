@@ -72,12 +72,19 @@ class AtelierProvider extends ChangeNotifier {
     String? telephone,
     String? ville,
   }) async {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return 'Utilisateur non connecté';
+    final user = _auth.currentUser;
+    if (user == null) return 'Utilisateur non connecté';
+    final userId = user.uid;
 
     try {
+      // S'assure que l'utilisateur est rechargé et que le jeton Auth est propagé
+      try {
+        await user.reload();
+      } catch (_) {}
+
       final now = FieldValue.serverTimestamp();
-      await _firestore.collection('ateliers').doc(userId).set({
+      final docRef = _firestore.collection('ateliers').doc(userId);
+      final atelierData = {
         'nomAtelier': nomAtelier,
         'specialite': specialite,
         'telephone': telephone,
@@ -85,12 +92,27 @@ class AtelierProvider extends ChangeNotifier {
         'logoUrl': null,
         'createdAt': now,
         'updatedAt': now,
-      });
+      };
+
+      try {
+        await docRef.set(atelierData, SetOptions(merge: true));
+      } catch (e) {
+        if (e is FirebaseException && e.code == 'permission-denied') {
+          // Attente de propagation transitoire du jeton d'authentification (cas nouveau compte)
+          await Future.delayed(const Duration(milliseconds: 600));
+          await _auth.currentUser?.reload();
+          await docRef.set(atelierData, SetOptions(merge: true));
+        } else {
+          rethrow;
+        }
+      }
+
       // Pas besoin de mettre à jour `_atelier` manuellement : l'écoute
       // temps réel (_listen) reçoit ce changement automatiquement, y
       // compris hors ligne (écriture locale reflétée immédiatement).
       return null;
     } catch (e) {
+      debugPrint('[AtelierProvider] Erreur createAtelier : $e');
       return friendlyFirestoreError(e);
     }
   }
