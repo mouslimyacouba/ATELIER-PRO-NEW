@@ -24,6 +24,15 @@ void main() {
       expect(firebaseRules, rootRules);
     });
 
+    test('firestore rules enforce non-negative validation for orders, payments and stock', () {
+      expect(rootRules, contains('function isValidOrder(data)'));
+      expect(rootRules, contains('function isValidPayment(data)'));
+      expect(rootRules, contains('function isValidStock(data)'));
+      expect(rootRules, contains('data.prixTotal >= 0'));
+      expect(rootRules, contains('data.montant > 0'));
+      expect(rootRules, contains('data.quantite >= 0'));
+    });
+
     test('stock uses owner checks for every operation', () {
       expect(rootRules, contains('match /stock/{docId}'));
       expect(

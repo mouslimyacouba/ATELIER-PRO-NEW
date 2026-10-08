@@ -16,6 +16,24 @@ service cloud.firestore {
       return isSignedIn() && data.userId == request.auth.uid;
     }
 
+    function isValidOrder(data) {
+      return data.prixTotal >= 0
+        && data.acompte >= 0
+        && (!('coutMateriaux' in data) || data.coutMateriaux >= 0)
+        && (!('coutMainDoeuvre' in data) || data.coutMainDoeuvre >= 0)
+        && (!('coutTransport' in data) || data.coutTransport >= 0);
+    }
+
+    function isValidPayment(data) {
+      return data.montant > 0;
+    }
+
+    function isValidStock(data) {
+      return data.quantite >= 0
+        && data.seuilAlerte >= 0
+        && data.coutUnitaire >= 0;
+    }
+
     match /ateliers/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
@@ -28,14 +46,14 @@ service cloud.firestore {
 
     match /commandes/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && isValidOrder(request.resource.data);
+      allow create: if isOwner(request.resource.data) && isValidOrder(request.resource.data);
     }
 
     match /paiements/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && isValidPayment(request.resource.data);
+      allow create: if isOwner(request.resource.data) && isValidPayment(request.resource.data);
     }
 
     match /fiches/{docId} {
@@ -52,8 +70,8 @@ service cloud.firestore {
 
     match /stock/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && isValidStock(request.resource.data);
+      allow create: if isOwner(request.resource.data) && isValidStock(request.resource.data);
     }
 
     match /historique_modifications/{docId} {
