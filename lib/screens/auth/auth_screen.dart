@@ -455,7 +455,7 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 4),
         Text(
           _isSignUp
-              ? 'Un compte, un atelier — en une seule étape'
+              ? 'Créez votre compte pour configurer votre atelier'
               : 'Connectez-vous pour gérer votre atelier',
           textAlign: TextAlign.center,
           style: const TextStyle(color: AtelierProColors.onSurfaceVariant),
@@ -508,7 +508,7 @@ class _AuthScreenState extends State<AuthScreen> {
         if (_isSignUp) ...[
           const SizedBox(height: 8),
           const Text(
-            'Tu pourras configurer ton atelier juste après la connexion.',
+            'La configuration de votre atelier se fera juste après.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AtelierProColors.onSurfaceMuted),
           ),
