@@ -55,8 +55,8 @@ class AtelierPayment {
       'clientId': clientId,
       'montant': montant,
       'mode': mode,
-      'datePaiement': Timestamp.fromDate(DateTime.now()), // idem : évite de disparaître de la liste triée
-      'createdAt': Timestamp.fromDate(DateTime.now()), // pas serverTimestamp() : sinon disparaît des listes triées jusqu'à confirmation serveur
+      'datePaiement': Timestamp.fromDate(datePaiement),
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 }

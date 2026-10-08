@@ -1,9 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:atelierpro_mobile/models/type_atelier.dart';
 import 'package:atelierpro_mobile/models/order.dart';
-import 'package:atelierpro_mobile/models/payment.dart';
 import 'package:atelierpro_mobile/models/historique_entry.dart';
-import 'package:atelierpro_mobile/core/config/metier_registry.dart';
 
 void main() {
   group('PHASE 3 — Validation Fiche de commande dynamique', () {

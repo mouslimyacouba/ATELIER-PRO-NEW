@@ -156,6 +156,9 @@ class AtelierOrder {
           ? Map<String, dynamic>.from(map['specificationsMetier'] as Map)
           : null,
       numero: (map['numero'] as num?)?.toInt(),
+      coutMateriaux: (map['coutMateriaux'] as num?)?.toDouble() ?? 0.0,
+      coutMainDoeuvre: (map['coutMainDoeuvre'] as num?)?.toDouble() ?? 0.0,
+      coutTransport: (map['coutTransport'] as num?)?.toDouble() ?? 0.0,
     );
   }
 

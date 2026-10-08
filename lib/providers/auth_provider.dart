@@ -25,9 +25,10 @@ class AuthProvider extends ChangeNotifier {
   /// d'e-mail à vérifier dans ce cas). Ne se met à jour qu'après un appel à
   /// `checkEmailVerified()` (Firebase ne pousse pas ce changement tout seul).
   bool get emailVerified {
-    if (_user == null) return false;
-    if (_user!.email == null) return true; // compte téléphone, pas d'email
-    return _user!.emailVerified;
+    final u = _user;
+    if (u == null) return false;
+    if (u.email == null) return true; // compte téléphone, pas d'email
+    return u.emailVerified;
   }
 
   AuthProvider() {

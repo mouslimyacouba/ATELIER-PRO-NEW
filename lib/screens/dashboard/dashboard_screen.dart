@@ -12,6 +12,7 @@ import '../../providers/atelier_provider.dart';
 import '../../providers/clients_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/fiches_mesures_provider.dart';
+import '../../providers/stock_provider.dart';
 import '../../widgets/error_banner.dart';
 import '../../widgets/spinner.dart';
 
@@ -42,6 +43,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context.read<OrdersProvider>().load(userId),
       context.read<ClientsProvider>().load(userId),
       context.read<FichesMesuresProvider>().load(userId),
+      context.read<StockProvider>().load(userId),
     ]);
   }
 
@@ -85,6 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final orders = context.watch<OrdersProvider>();
     final clients = context.watch<ClientsProvider>();
     final fiches = context.watch<FichesMesuresProvider>();
+    final stock = context.watch<StockProvider>();
 
     final now = DateTime.now();
     final ordersThisMonth = orders.orders
@@ -191,7 +194,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+
+                        if (stock.itemsEnAlerte.isNotEmpty) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AtelierProColors.statusUrgent.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AtelierProColors.statusUrgent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, color: AtelierProColors.statusUrgent, size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    '⚠️ ${stock.itemsEnAlerte.length} article(s) en stock faible (${stock.itemsEnAlerte.map((i) => i.nom).join(', ')})',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AtelierProColors.statusUrgent),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => context.push('/stock'),
+                                  child: const Text('Voir'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
                         // Strip "Aujourd'hui"
                         Container(

@@ -106,19 +106,6 @@ class _ModeleFormScreenState extends State<ModeleFormScreen> {
     });
   }
 
-  void _ajouterChampMesure() {
-    setState(() {
-      _champsMesuresControllers.add(TextEditingController());
-    });
-  }
-
-  void _supprimerChampMesure(int index) {
-    setState(() {
-      _champsMesuresControllers[index].dispose();
-      _champsMesuresControllers.removeAt(index);
-    });
-  }
-
   void _ajouterMateriau() {
     setState(() {
       _materiauxControllers.add(TextEditingController());

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/stock_provider.dart';
@@ -106,10 +105,10 @@ class _StockFormScreenState extends State<StockFormScreen> {
       userId: userId,
       nom: _nomCtrl.text.trim(),
       categorie: _categorieCtrl.text.trim(),
-      quantite: double.tryParse(_quantiteCtrl.text.trim()) ?? 0.0,
+      quantite: double.tryParse(_quantiteCtrl.text.replaceAll(',', '.').trim()) ?? 0.0,
       unite: _uniteCtrl.text.trim(),
-      seuilAlerte: double.tryParse(_seuilAlerteCtrl.text.trim()) ?? 2.0,
-      coutUnitaire: double.tryParse(_coutUnitaireCtrl.text.trim()) ?? 0.0,
+      seuilAlerte: double.tryParse(_seuilAlerteCtrl.text.replaceAll(',', '.').trim()) ?? 2.0,
+      coutUnitaire: double.tryParse(_coutUnitaireCtrl.text.replaceAll(',', '.').trim()) ?? 0.0,
       updatedAt: DateTime.now(),
     );
 
@@ -226,7 +225,7 @@ class _StockFormScreenState extends State<StockFormScreen> {
                           controller: _quantiteCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: _inputDecoration('Quantité en stock *', 'Ex: 15.5'),
-                          validator: (v) => (v == null || double.tryParse(v) == null) ? 'Quantité invalide' : null,
+                          validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Quantité invalide' : null,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -257,7 +256,7 @@ class _StockFormScreenState extends State<StockFormScreen> {
                     controller: _seuilAlerteCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: _inputDecoration('Seuil d\'alerte stock faible', 'Alerte si la quantité baisse sous...'),
-                    validator: (v) => (v == null || double.tryParse(v) == null) ? 'Seuil invalide' : null,
+                    validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Seuil invalide' : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -265,7 +264,7 @@ class _StockFormScreenState extends State<StockFormScreen> {
                     controller: _coutUnitaireCtrl,
                     keyboardType: TextInputType.number,
                     decoration: _inputDecoration('Coût d\'achat unitaire (FCFA)', 'Ex: 4500'),
-                    validator: (v) => (v == null || double.tryParse(v) == null) ? 'Montant invalide' : null,
+                    validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Montant invalide' : null,
                   ),
                   const SizedBox(height: 32),
 

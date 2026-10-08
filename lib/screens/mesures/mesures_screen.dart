@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/fiche_templates.dart';
@@ -41,7 +40,9 @@ class _MesuresScreenState extends State<MesuresScreen> {
   }
 
   Future<void> _openForm({FicheMesure? existing}) async {
-    final userId = context.read<AtelierProvider>().atelier!.userId;
+    final atelier = context.read<AtelierProvider>().atelier;
+    if (atelier == null) return;
+    final userId = atelier.userId;
     final clients = context.read<ClientsProvider>().clients;
     final template = _template;
     final titreCtrl = TextEditingController(text: existing?.titre ?? template.nomFiche);

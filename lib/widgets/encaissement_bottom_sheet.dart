@@ -244,7 +244,7 @@ class _EncaissementBottomSheetState extends State<EncaissementBottomSheet> {
             // Bouton de validation principal
             ElevatedButton(
               onPressed: () {
-                final amount = double.tryParse(_amountController.text) ?? 0;
+                final amount = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0;
                 widget.onPaymentConfirmed(amount);
                 Navigator.pop(context);
               },
