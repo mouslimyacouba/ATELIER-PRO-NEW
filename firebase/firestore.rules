@@ -8,79 +8,214 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ───────── Authentification ─────────
+
+    // Connecté ET identité vérifiée : e-mail vérifié (e-mail/mot de passe,
+    // Google) ou compte téléphone (pas d'e-mail à vérifier). Le routeur de
+    // l'app applique déjà cette règle côté client ; ici on l'impose aussi
+    // côté serveur pour qu'un appel direct au SDK ne la contourne pas.
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && (request.auth.token.email_verified == true
+            || request.auth.token.firebase.sign_in_provider == 'phone');
     }
 
     function isOwner(data) {
       return isSignedIn() && data.userId == request.auth.uid;
     }
 
+    // ───────── Helpers de validation ─────────
+    // `data.get(clé, null)` renvoie null si le champ est absent : les champs
+    // optionnels (null côté Dart) restent donc acceptés.
+
+    function reqStr(data, key, min, max) {
+      let v = data.get(key, null);
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    function optStr(data, key, max) {
+      let v = data.get(key, null);
+      return v == null || (v is string && v.size() <= max);
+    }
+
+    function optList(data, key, max) {
+      let v = data.get(key, null);
+      return v == null || (v is list && v.size() <= max);
+    }
+
+    function optMap(data, key) {
+      let v = data.get(key, null);
+      return v == null || v is map;
+    }
+
+    function optMoney(data, key) {
+      let v = data.get(key, null);
+      return v == null || (v is number && v >= 0 && v <= 1000000000000);
+    }
+
+    // ───────── Validation par collection ─────────
+
+    function isValidAtelier(data) {
+      return reqStr(data, 'nomAtelier', 1, 120)
+        && optStr(data, 'telephone', 30)
+        && optStr(data, 'ville', 100)
+        && optStr(data, 'specialite', 100)
+        && optStr(data, 'logoUrl', 2048);
+    }
+
+    // Le métier (`specialite`) se choisit une seule fois, à la création de
+    // l'atelier : une mise à jour ne peut plus le modifier. Un ancien atelier
+    // sans métier enregistré peut encore en recevoir un.
+    function isMetierUnchanged() {
+      return resource.data.get('specialite', null) == null
+        || request.resource.data.get('specialite', null) == resource.data.specialite;
+    }
+
+    function isValidClient(data) {
+      return reqStr(data, 'nomComplet', 1, 120)
+        && optStr(data, 'telephone', 30)
+        && optStr(data, 'adresse', 300)
+        && optStr(data, 'notes', 5000)
+        && optStr(data, 'photoUrl', 2048);
+    }
+
     function isValidOrder(data) {
-      return data.prixTotal >= 0
-        && data.acompte >= 0
-        && (!('coutMateriaux' in data) || data.coutMateriaux >= 0)
-        && (!('coutMainDoeuvre' in data) || data.coutMainDoeuvre >= 0)
-        && (!('coutTransport' in data) || data.coutTransport >= 0);
+      return data.prixTotal is number && data.prixTotal >= 0
+        && data.prixTotal <= 1000000000000
+        && data.acompte is number && data.acompte >= 0
+        && data.acompte <= 1000000000000
+        && optMoney(data, 'coutMateriaux')
+        && optMoney(data, 'coutMainDoeuvre')
+        && optMoney(data, 'coutTransport')
+        && data.statut in ['en_attente', 'en_cours', 'termine', 'livre', 'annule']
+        && optStr(data, 'description', 5000)
+        && optStr(data, 'clientNom', 200)
+        && optList(data, 'photoUrls', 50)
+        && optList(data, 'etapesSnapshot', 100)
+        && optMap(data, 'specificationsMetier')
+        && (data.get('numero', null) == null
+            || (data.numero is int && data.numero >= 0));
     }
 
     function isValidPayment(data) {
-      return data.montant > 0;
+      return data.montant is number && data.montant > 0
+        && data.montant <= 1000000000000
+        && reqStr(data, 'commandeId', 1, 128)
+        && optStr(data, 'clientId', 128)
+        && optStr(data, 'mode', 50);
+    }
+
+    function isValidFiche(data) {
+      return optStr(data, 'clientId', 128)
+        && optStr(data, 'titre', 150)
+        && optMap(data, 'mesures')
+        && optStr(data, 'notes', 5000);
+    }
+
+    function isValidModele(data) {
+      return reqStr(data, 'nom', 1, 150)
+        && optStr(data, 'typeProduit', 100)
+        && optStr(data, 'description', 5000)
+        && optStr(data, 'photoUrl', 2048)
+        && optList(data, 'champsMesures', 100)
+        && optList(data, 'materiauxDefaut', 100)
+        && optList(data, 'etapes', 100)
+        && optMoney(data, 'prixIndicatif')
+        && (data.get('actif', null) == null || data.actif is bool);
     }
 
     function isValidStock(data) {
-      return data.quantite >= 0
-        && data.seuilAlerte >= 0
-        && data.coutUnitaire >= 0;
+      return reqStr(data, 'nom', 1, 150)
+        && optStr(data, 'categorie', 100)
+        && optStr(data, 'unite', 30)
+        && data.quantite is number && data.quantite >= 0
+        && data.seuilAlerte is number && data.seuilAlerte >= 0
+        && data.coutUnitaire is number && data.coutUnitaire >= 0;
     }
 
+    function isValidHistorique(data) {
+      return reqStr(data, 'commandeId', 1, 128)
+        && reqStr(data, 'champModifie', 1, 100)
+        && optStr(data, 'ancienneValeur', 2000)
+        && optStr(data, 'nouvelleValeur', 2000);
+    }
+
+    function isValidCompteur(data) {
+      return data.dernierNumero is int
+        && data.dernierNumero >= 0
+        && data.dernierNumero < 100000000;
+    }
+
+    // ───────── Collections ─────────
+
     match /ateliers/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, delete: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && isValidAtelier(request.resource.data);
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && isValidAtelier(request.resource.data)
+        && isMetierUnchanged();
     }
 
     match /clients/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && isValidClient(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidClient(request.resource.data);
     }
 
     match /commandes/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && isValidOrder(request.resource.data);
-      allow create: if isOwner(request.resource.data) && isValidOrder(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && isValidOrder(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidOrder(request.resource.data);
     }
 
     match /paiements/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && isValidPayment(request.resource.data);
-      allow create: if isOwner(request.resource.data) && isValidPayment(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && isValidPayment(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidPayment(request.resource.data);
     }
 
     match /fiches/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && isValidFiche(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidFiche(request.resource.data);
     }
 
     match /modeles/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && isValidModele(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidModele(request.resource.data);
     }
 
     match /stock/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow update: if isOwner(resource.data) && isOwner(request.resource.data) && isValidStock(request.resource.data);
-      allow create: if isOwner(request.resource.data) && isValidStock(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data)
+        && isValidStock(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidStock(request.resource.data);
     }
 
+    // Journal d'audit : création et lecture seulement (jamais de mise à jour).
     match /historique_modifications/{docId} {
       allow read, delete: if isOwner(resource.data);
-      allow create: if isOwner(request.resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isValidHistorique(request.resource.data);
     }
 
     match /compteurs/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, delete: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId
+        && isValidCompteur(request.resource.data);
     }
   }
 }

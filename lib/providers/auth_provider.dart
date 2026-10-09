@@ -1,17 +1,24 @@
 import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../core/attempt_guard.dart';
+import '../core/password_policy.dart';
 
 class AuthProvider extends ChangeNotifier {
   final _auth = FirebaseAuth.instance;
+  final AttemptGuard _attemptGuard = AttemptGuard();
   StreamSubscription<User?>? _sub;
   String? _phoneVerificationId;
 
   User? _user;
   bool _loading = true;
   String? _error;
+  String? _lastErrorCode;
 
   /// Alias conservé pour compat avec le routeur, qui ne teste que
   /// `session != null` (peu importe le type exact de session/utilisateur).
@@ -19,6 +26,10 @@ class AuthProvider extends ChangeNotifier {
   User? get user => _user;
   bool get loading => _loading;
   String? get error => _error;
+  String? get lastErrorCode => _lastErrorCode;
+  List<String> get signInProviders =>
+      _user?.providerData.map((info) => info.providerId).toList() ??
+      const <String>[];
 
   /// Vrai si connecté et l'e-mail est vérifié — toujours vrai pour Google
   /// (Google a déjà vérifié l'e-mail) et pour un compte téléphone (pas
@@ -30,6 +41,9 @@ class AuthProvider extends ChangeNotifier {
     if (u.email == null) return true; // compte téléphone, pas d'email
     return u.emailVerified;
   }
+
+  bool get isLocked => _attemptGuard.isLocked;
+  Duration get lockRemaining => _attemptGuard.remaining;
 
   AuthProvider() {
     _user = _auth.currentUser;
@@ -47,23 +61,21 @@ class AuthProvider extends ChangeNotifier {
   }
 
   String _messageFor(FirebaseAuthException e) {
-    // FirebaseAuthException.message est souvent en anglais et technique ;
-    // on traduit les cas les plus courants pour rester cohérent avec le
-    // reste de l'app (en français, orienté utilisateur non-technique).
+    _lastErrorCode = e.code;
     switch (e.code) {
       case 'invalid-email':
         return 'Adresse e-mail invalide.';
       case 'user-disabled':
         return 'Ce compte a été désactivé.';
       case 'user-not-found':
-        return 'Aucun compte avec cet e-mail.';
+        return 'Impossible de se connecter avec ces informations.';
       case 'wrong-password':
       case 'invalid-credential':
-        return 'E-mail ou mot de passe incorrect.';
+        return 'Impossible de se connecter avec ces informations.';
       case 'email-already-in-use':
         return 'Un compte existe déjà avec cet e-mail.';
       case 'weak-password':
-        return 'Mot de passe trop faible (6 caractères minimum).';
+        return 'Le mot de passe ne respecte pas la politique de sécurité.';
       case 'requires-recent-login':
         return 'Pour ta sécurité, déconnecte-toi puis reconnecte-toi avant de changer ton mot de passe.';
       case 'network-request-failed':
@@ -83,12 +95,95 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Firebase exige une authentification récente (moins de cinq minutes)
+  /// avant la suppression définitive d'un compte.
+  Future<bool> hasRecentLogin() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    try {
+      final token = await user.getIdTokenResult();
+      final authTime = token.authTime;
+      if (authTime == null) return false;
+      final elapsed = DateTime.now().difference(authTime);
+      return !elapsed.isNegative && elapsed < const Duration(minutes: 5);
+    } on FirebaseAuthException catch (e) {
+      _error = _messageFor(e);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<String?> reauthenticateWithPassword(String password) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) {
+      _lastErrorCode = null;
+      _error = 'Aucun compte e-mail et mot de passe actif.';
+      notifyListeners();
+      return _error;
+    }
+
+    try {
+      _lastErrorCode = null;
+      _error = null;
+      final credential =
+          EmailAuthProvider.credential(email: email, password: password);
+      await user.reauthenticateWithCredential(credential);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      _error = _messageFor(e);
+      notifyListeners();
+      return _error;
+    }
+  }
+
+  Future<String?> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      _lastErrorCode = null;
+      _error = 'Aucun compte connecté à supprimer.';
+      notifyListeners();
+      return _error;
+    }
+    try {
+      _lastErrorCode = null;
+      _error = null;
+      await user.delete();
+      _user = null;
+      notifyListeners();
+      return null;
+    } on FirebaseAuthException catch (e) {
+      _error = _messageFor(e);
+      notifyListeners();
+      return _error;
+    }
+  }
+
+  String? _genericLockMessage() {
+    if (!_attemptGuard.isLocked) return null;
+    final seconds = _attemptGuard.remaining.inSeconds;
+    if (seconds <= 0) return null;
+    if (seconds < 60)
+      return 'Trop de tentatives. Réessaie dans $seconds secondes.';
+    final minutes = (seconds / 60).ceil();
+    return 'Trop de tentatives. Réessaie dans $minutes minute${minutes > 1 ? 's' : ''}.';
+  }
+
   Future<String?> signUp(
       {required String email, required String password}) async {
+    final trimmedEmail = email.trim();
+    final policyError = PasswordPolicy.validate(password, email: trimmedEmail);
+    if (policyError != null) {
+      _error = policyError;
+      notifyListeners();
+      return _error;
+    }
+
     try {
       _error = null;
       await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
+          email: trimmedEmail, password: password);
+      _attemptGuard.recordSuccess();
       return null;
     } on FirebaseAuthException catch (e) {
       _error = _messageFor(e);
@@ -99,18 +194,37 @@ class AuthProvider extends ChangeNotifier {
 
   Future<String?> signIn(
       {required String email, required String password}) async {
+    final trimmedEmail = email.trim();
+    if (_attemptGuard.isLocked) {
+      final msg = _genericLockMessage();
+      if (msg != null) {
+        _error = msg;
+        notifyListeners();
+        return _error;
+      }
+    }
+
     try {
       _error = null;
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await _auth.signInWithEmailAndPassword(
+        email: trimmedEmail,
+        password: password,
+      );
+      _attemptGuard.recordSuccess();
       return null;
     } on FirebaseAuthException catch (e) {
-      _error = _messageFor(e);
+      _attemptGuard.recordFailure();
+      final lockMsg = _genericLockMessage();
+      _error = lockMsg ?? _messageFor(e);
       notifyListeners();
       return _error;
     }
   }
 
   Future<String?> updatePassword(String newPassword) async {
+    final policyError =
+        PasswordPolicy.validate(newPassword, email: _user?.email);
+    if (policyError != null) return policyError;
     try {
       await _auth.currentUser?.updatePassword(newPassword);
       return null;
@@ -124,7 +238,7 @@ class AuthProvider extends ChangeNotifier {
   /// configuration de deep-link nécessaire côté mobile pour cette étape.
   Future<String?> resetPasswordForEmail(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase());
       return null;
     } on FirebaseAuthException catch (e) {
       return _messageFor(e);
@@ -147,6 +261,10 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> checkEmailVerified() async {
     try {
       await _auth.currentUser?.reload();
+      // Les règles Firestore/Storage lisent `email_verified` dans le jeton
+      // d'identité : sans ce rafraîchissement, il garde l'ancienne valeur
+      // (non vérifiée) jusqu'à environ une heure.
+      await _auth.currentUser?.getIdToken(true);
     } catch (_) {
       // Session possiblement invalidée entre-temps — pas bloquant ici.
     }
@@ -164,10 +282,18 @@ class AuthProvider extends ChangeNotifier {
   Future<(String?, bool)> signInWithGoogle() async {
     try {
       _error = null;
-      // Sur Web, on utilise explicitement le Client ID Web.
-      // Sur Android / iOS, on utilise la configuration native (google-services.json / plist).
-      final clientId = dotenv.env['FIREBASE_WEB_CLIENT_ID'];
-      final googleSignIn = kIsWeb ? GoogleSignIn(clientId: clientId) : GoogleSignIn();
+      // Android utilise serverClientId pour générer l'idToken accepté par
+      // Firebase. clientId n'est pas pris en charge par le plugin Android.
+      final serverClientId = dotenv.env['FIREBASE_WEB_CLIENT_ID'];
+      if (serverClientId == null || serverClientId.isEmpty) {
+        return (
+          'Connexion Google impossible : la configuration OAuth Web est absente.',
+          false
+        );
+      }
+      final googleSignIn = kIsWeb
+          ? GoogleSignIn(clientId: serverClientId)
+          : GoogleSignIn(serverClientId: serverClientId);
 
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
@@ -268,8 +394,11 @@ class AuthProvider extends ChangeNotifier {
     // sans même demander confirmation. Sans effet si la session n'était pas
     // une session Google (ne lève pas d'erreur).
     try {
-      final clientId = dotenv.env['FIREBASE_WEB_CLIENT_ID'];
-      await GoogleSignIn(clientId: clientId).signOut();
+      final serverClientId = dotenv.env['FIREBASE_WEB_CLIENT_ID'];
+      final googleSignIn = kIsWeb
+          ? GoogleSignIn(clientId: serverClientId)
+          : GoogleSignIn(serverClientId: serverClientId);
+      await googleSignIn.signOut();
     } catch (_) {
       // ignore — pas grave si l'utilisateur n'était pas connecté via Google
     }

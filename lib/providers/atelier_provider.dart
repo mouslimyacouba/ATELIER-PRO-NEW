@@ -129,6 +129,9 @@ class AtelierProvider extends ChangeNotifier {
     final mapped = {
       for (final entry in changes.entries) (keyMap[entry.key] ?? entry.key): entry.value,
     };
+    // Le métier se choisit une seule fois à la création; les règles Firestore
+    // empêchent également sa modification côté serveur.
+    mapped.remove('specialite');
     mapped['updatedAt'] = FieldValue.serverTimestamp();
 
     try {
@@ -141,26 +144,27 @@ class AtelierProvider extends ChangeNotifier {
 
   Future<String?> updateLogo(String logoUrl) => updateAtelier({'logo_url': logoUrl});
 
-  /// Supprime définitivement l'atelier et toutes ses données liées (clients,
-  /// commandes, paiements, fiches). Contrairement à Postgres, Firestore n'a
-  /// pas de ON DELETE CASCADE : on supprime manuellement chaque collection
-  /// liée par lots (batch) avant de supprimer le document atelier lui-même.
-  /// Ne supprime PAS le compte Firebase Auth (nécessiterait une Cloud
-  /// Function avec droits admin — hors scope ici, comme pour iPayMoney).
+  /// Supprime toutes les données liées avant l'atelier. Le compte Firebase
+  /// Auth est supprimé ensuite par `AuthProvider.deleteAccount`, pendant que
+  /// les règles Firestore exigent encore une session valide.
   Future<String?> deleteAtelier() async {
-    if (_atelier == null) return null;
-    final userId = _atelier!.id;
+    final user = _auth.currentUser;
+    if (user == null) return 'Utilisateur non connecté';
+    final userId = user.uid;
 
     try {
-      // Pas de contrainte de clé étrangère côté Firestore (contrairement à
-      // Postgres) donc aucune dépendance d'ordre entre ces 4 collections —
-      // on les supprime en parallèle plutôt que l'une après l'autre.
+      // Pas de contrainte de clé étrangère côté Firestore : ces collections
+      // peuvent être supprimées en parallèle. L'atelier reste jusqu'à la fin.
       await Future.wait([
         _deleteAllWhereUserId('fiches', userId),
         _deleteAllWhereUserId('paiements', userId),
         _deleteAllWhereUserId('commandes', userId),
         _deleteAllWhereUserId('clients', userId),
+        _deleteAllWhereUserId('stock', userId),
+        _deleteAllWhereUserId('modeles', userId),
+        _deleteAllWhereUserId('historique_modifications', userId),
       ]);
+      await _firestore.collection('compteurs').doc(userId).delete();
       await _firestore.collection('ateliers').doc(userId).delete();
       return null;
     } catch (e) {

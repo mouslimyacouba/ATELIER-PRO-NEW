@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../core/contact_actions.dart';
 import '../../core/storage_service.dart';
 import '../../core/theme.dart';
-import '../../models/type_atelier.dart';
 import '../../providers/atelier_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import 'delete_account_dialogs.dart';
+import 'widgets/locked_metier_tile.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _appVersion = '';
   bool _uploadingLogo = false;
+  bool _deletingAccount = false;
 
   @override
   void initState() {
@@ -76,7 +79,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final nomCtrl = TextEditingController(text: atelier.nomAtelier);
     final telephoneCtrl = TextEditingController(text: atelier.telephone ?? '');
     final villeCtrl = TextEditingController(text: atelier.ville ?? '');
-    TypeAtelier typeAtelier = atelier.typeAtelier;
     final formKey = GlobalKey<FormState>();
 
     final saved = await showModalBottomSheet<bool>(
@@ -108,26 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<TypeAtelier>(
-                  value: typeAtelier,
-                  decoration:
-                      const InputDecoration(labelText: "Métier de l'atelier"),
-                  items: TypeAtelier.values
-                      .map((t) =>
-                          DropdownMenuItem(value: t, child: Text(t.dbValue)))
-                      .toList(),
-                  onChanged: (v) =>
-                      setSheetState(() => typeAtelier = v ?? typeAtelier),
-                ),
-                if (typeAtelier != atelier.typeAtelier) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    "⚠️ Changer de métier modifie les champs proposés pour les prochaines fiches. "
-                    "Les fiches déjà créées restent inchangées.",
-                    style: const TextStyle(
-                        fontSize: 11, color: AtelierProColors.onSurfaceMuted),
-                  ),
-                ],
+                LockedMetierTile(metier: atelier.specialiteLabel),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: telephoneCtrl,
@@ -139,7 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return null;
                     final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-                    if (digits.length != 8) return 'Le numéro doit avoir 8 chiffres';
+                    if (digits.length != 8)
+                      return 'Le numéro doit avoir 8 chiffres';
                     return null;
                   },
                 ),
@@ -155,7 +139,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     final error =
                         await context.read<AtelierProvider>().updateAtelier({
                       'nom_atelier': nomCtrl.text.trim(),
-                      'specialite': typeAtelier.dbValue,
                       'telephone': telephoneCtrl.text.trim().isEmpty
                           ? null
                           : telephoneCtrl.text.trim(),
@@ -217,47 +200,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer mon compte ?'),
-        content: const Text(
-          'Ton atelier, tes clients, commandes, fiches et paiements seront '
-          'définitivement supprimés. Cette action est irréversible.',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Annuler')),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer',
-                style: TextStyle(color: AtelierProColors.rougeAlerte)),
-          ),
-        ],
-      ),
-    );
+    if (_deletingAccount) return;
+    final confirmed = await showDeleteAccountConfirmation(context);
     if (confirmed != true || !mounted) return;
 
-    final atelier = context.read<AtelierProvider>().atelier;
-    if (atelier != null) {
-      final error = await context.read<AtelierProvider>().deleteAtelier();
-      if (error != null && mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error)));
+    setState(() => _deletingAccount = true);
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final atelierProvider = context.read<AtelierProvider>();
+      final recentLogin = await authProvider.hasRecentLogin();
+      if (!mounted) return;
+
+      if (!recentLogin) {
+        if (authProvider.signInProviders.contains('password')) {
+          final password = await showDeleteAccountPasswordDialog(context);
+          if (password == null || !mounted) return;
+          final error = await authProvider.reauthenticateWithPassword(password);
+          if (error != null) {
+            _showDeleteError(error);
+            return;
+          }
+        } else {
+          final reconnect = await showReloginBeforeDeleteDialog(context);
+          if (reconnect != true || !mounted) return;
+          await authProvider.signOut();
+          return;
+        }
       }
+
+      final dataError = await atelierProvider.deleteAtelier();
+      if (dataError != null) {
+        _showDeleteError(dataError);
+        return;
+      }
+
+      final accountError = await authProvider.deleteAccount();
+      if (accountError != null) {
+        _showDeleteError(accountError);
+        return;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Ton compte et tes données ont été supprimés.')),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        _showDeleteError(
+          context.read<AuthProvider>().error ?? e.message ?? e.code,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deletingAccount = false);
     }
+  }
+
+  void _showDeleteError(String message) {
     if (!mounted) return;
-    await context.read<AuthProvider>().signOut();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Tes données ont été supprimées. Pour supprimer aussi ton compte de connexion, contacte le support.',
-          ),
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -433,12 +436,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: _confirmDeleteAccount,
-            child: const Text(
-              'Supprimer mes données et mon compte',
-              style: TextStyle(
-                  color: AtelierProColors.onSurfaceMuted, fontSize: 12),
-            ),
+            onPressed: _deletingAccount ? null : _confirmDeleteAccount,
+            child: _deletingAccount
+                ? const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 10),
+                      Text('Suppression en cours…'),
+                    ],
+                  )
+                : const Text(
+                    'Supprimer mon compte et mes données',
+                    style: TextStyle(
+                      color: AtelierProColors.onSurfaceMuted,
+                      fontSize: 12,
+                    ),
+                  ),
           ),
           if (_appVersion.isNotEmpty) ...[
             const SizedBox(height: 24),

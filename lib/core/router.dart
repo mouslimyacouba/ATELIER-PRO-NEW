@@ -40,16 +40,21 @@ GoRouter buildRouter(BuildContext context) {
       final loggingIn = state.matchedLocation == '/auth';
       final onboarding = state.matchedLocation == '/onboarding';
       final verifyingEmail = state.matchedLocation == '/verify-email';
+      final legalPage = state.matchedLocation == '/conditions' ||
+          state.matchedLocation == '/confidentialite';
 
-      if (!loggedIn) return loggingIn ? null : '/auth';
+      if (!loggedIn) return loggingIn || legalPage ? null : '/auth';
 
-      if (!auth.emailVerified) return verifyingEmail ? null : '/verify-email';
+      if (!auth.emailVerified) {
+        return verifyingEmail || legalPage ? null : '/verify-email';
+      }
       if (loggingIn || verifyingEmail) return '/';
 
       if (loggedIn &&
           !atelierProvider.loading &&
           atelierProvider.atelier == null &&
-          !onboarding) {
+          !onboarding &&
+          !legalPage) {
         return '/onboarding';
       }
       if (loggedIn && atelierProvider.atelier != null && onboarding) {
@@ -65,20 +70,27 @@ GoRouter buildRouter(BuildContext context) {
       GoRoute(
           path: '/onboarding',
           builder: (context, state) => const OnboardingScreen()),
+      GoRoute(
+          path: '/conditions',
+          builder: (context, state) => const TermsScreen()),
+      GoRoute(
+          path: '/confidentialite',
+          builder: (context, state) => const PrivacyPolicyScreen()),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
               path: '/', builder: (context, state) => const DashboardScreen()),
           GoRoute(
-              path: '/debug/metier', builder: (context, state) => const MetierDebugScreen()),
+              path: '/debug/metier',
+              builder: (context, state) => const MetierDebugScreen()),
           GoRoute(
               path: '/clients',
               builder: (context, state) => const ClientsScreen()),
           GoRoute(
             path: '/clients/:clientId',
-            builder: (context, state) =>
-                ClientDetailScreen(clientId: state.pathParameters['clientId'] ?? ''),
+            builder: (context, state) => ClientDetailScreen(
+                clientId: state.pathParameters['clientId'] ?? ''),
           ),
           GoRoute(
               path: '/commandes',
@@ -90,8 +102,8 @@ GoRouter buildRouter(BuildContext context) {
           ),
           GoRoute(
             path: '/commandes/:orderId',
-            builder: (context, state) =>
-                OrderDetailScreen(orderId: state.pathParameters['orderId'] ?? ''),
+            builder: (context, state) => OrderDetailScreen(
+                orderId: state.pathParameters['orderId'] ?? ''),
           ),
           GoRoute(
               path: '/mesures',
@@ -106,8 +118,7 @@ GoRouter buildRouter(BuildContext context) {
               path: '/parametres/cgu',
               builder: (context, state) => const TermsScreen()),
           GoRoute(
-              path: '/stock',
-              builder: (context, state) => const StockScreen()),
+              path: '/stock', builder: (context, state) => const StockScreen()),
           GoRoute(
               path: '/stock/nouveau',
               builder: (context, state) => const StockFormScreen()),
@@ -124,8 +135,8 @@ GoRouter buildRouter(BuildContext context) {
               builder: (context, state) => const ModeleFormScreen()),
           GoRoute(
             path: '/modeles/:modeleId',
-            builder: (context, state) => ModeleFormScreen(
-                modeleId: state.pathParameters['modeleId']),
+            builder: (context, state) =>
+                ModeleFormScreen(modeleId: state.pathParameters['modeleId']),
           ),
           GoRoute(
             path: '/historique/commandes',

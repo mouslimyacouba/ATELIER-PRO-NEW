@@ -54,9 +54,10 @@ android {
 
     buildTypes {
         release {
-            // Pour le test, on utilise la clé de debug afin d'éviter les erreurs 
-            // de signature si une version précédente est déjà installée.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
+                ?: throw GradleException(
+                    "Release signing is not configured. Check android/key.properties and its keystore path."
+                )
         }
     }
 }

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/contact_actions.dart';
+import '../../core/password_policy.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import 'forgot_password_dialog.dart';
+import 'widgets/auth_segmented_control.dart';
+import 'widgets/password_strength_meter.dart';
 
 enum _AuthMethod { email, phone }
 
@@ -18,24 +23,35 @@ class _AuthScreenState extends State<AuthScreen> {
   _AuthMethod _method = _AuthMethod.email;
   final _formKey = GlobalKey<FormState>();
 
-  // Email
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _isSignUp = false;
-  bool _passwordVisible = false;
-
-  // Téléphone
+  final _confirmPasswordCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
-  bool _codeSent = false;
 
+  bool _isSignUp = false;
+  bool _acceptedPolicies = false;
+  bool _passwordVisible = false;
+  bool _codeSent = false;
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl.addListener(_refreshForm);
+    _passwordCtrl.addListener(_refreshForm);
+  }
+
+  void _refreshForm() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     _phoneCtrl.dispose();
     _codeCtrl.dispose();
     super.dispose();
@@ -45,6 +61,11 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submitEmail() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isSignUp && !_acceptedPolicies) {
+      setState(() => _error =
+          'Acceptez les conditions et la politique de confidentialité pour continuer.');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -53,34 +74,34 @@ class _AuthScreenState extends State<AuthScreen> {
     final auth = context.read<AuthProvider>();
 
     if (_isSignUp) {
-      // Inscription seule. L'utilisateur sera redirigé vers l'onboarding
-      // via le router après connexion s'il n'a pas encore d'atelier.
       final signUpError = await auth.signUp(
-          email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
-      if (!mounted) return;
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
       if (signUpError != null) {
-        setState(() {
-          _loading = false;
-          _error = signUpError;
-        });
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error = signUpError;
+          });
+        }
         return;
       }
 
-      // Envoi de l'e-mail de confirmation.
-      // On conserve la session active afin que le routeur redirige
-      // automatiquement l'utilisateur vers l'écran /verify-email.
-      await auth.sendEmailVerification();
+      final verificationError = await auth.sendEmailVerification();
       if (!mounted) return;
 
       setState(() {
         _loading = false;
-        _error = null;
+        _error = verificationError;
       });
       return;
     }
 
     final result = await auth.signIn(
-        email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+    );
     if (!mounted) return;
     setState(() {
       _loading = false;
@@ -187,157 +208,96 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _forgotPassword() async {
-    final emailCtrl = TextEditingController(text: _emailCtrl.text.trim());
-    final formKey = GlobalKey<FormState>();
-    bool sending = false;
-    bool sent = false;
+    showForgotPasswordDialog(context, initialEmail: _emailCtrl.text.trim());
+  }
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: !sending,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AtelierProColors.primary.withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.lock_reset_outlined,
-                    color: AtelierProColors.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              const Text('Mot de passe oublié',
-                  style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            ],
+  void _setSignUp(bool value) {
+    setState(() {
+      _isSignUp = value;
+      _method = _AuthMethod.email;
+      _acceptedPolicies = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _openLegalPage(String path) async {
+    await context.push(path);
+  }
+
+  Widget _buildBrandHeader() {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AtelierProColors.primary,
+            borderRadius: BorderRadius.circular(12),
           ),
-          content: sent
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50).withAlpha(20),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: const Color(0xFF4CAF50).withAlpha(60)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline,
-                              color: Color(0xFF4CAF50), size: 24),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'E-mail envoyé à ${emailCtrl.text.trim()}\n\nVérifie ta boîte de réception.',
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF2E7D32)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                )
-              : Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Entre ton adresse e-mail et on t'envoie un lien pour choisir un nouveau mot de passe.",
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AtelierProColors.onSurfaceVariant,
-                            height: 1.4),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        autofocus: emailCtrl.text.isEmpty,
-                        decoration: const InputDecoration(
-                          labelText: 'Adresse e-mail',
-                          prefixIcon:
-                              Icon(Icons.mail_outline, size: 20),
-                        ),
-                        validator: (v) => (v == null || !v.contains('@'))
-                            ? 'E-mail invalide'
-                            : null,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-          actions: sent
-              ? [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Fermer'),
-                    ),
-                  ),
-                ]
-              : [
-                  TextButton(
-                    onPressed:
-                        sending ? null : () => Navigator.of(ctx).pop(),
-                    child: const Text('Annuler'),
-                  ),
-                  ElevatedButton(
-                    onPressed: sending
-                        ? null
-                        : () async {
-                            if (!formKey.currentState!.validate()) return;
-                            setDialogState(() => sending = true);
-                            // Capture du provider avant l'await pour éviter
-                            // l'utilisation de context à travers un gap async.
-                            final authProvider = context.read<AuthProvider>();
-                            final email = emailCtrl.text.trim();
-                            final error = await authProvider
-                                .resetPasswordForEmail(email);
-                            if (!ctx.mounted) return;
-                            if (error != null) {
-                              setDialogState(() => sending = false);
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  content: Text(error),
-                                  backgroundColor:
-                                      AtelierProColors.rougeAlerte,
-                                ),
-                              );
-                            } else {
-                              setDialogState(
-                                  () => sent = true);
-                            }
-                          },
-                    child: sending
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Envoyer le lien'),
-                  ),
-                ],
+          child: const Text(
+            'A',
+            style: TextStyle(
+              color: AtelierProColors.secondaryContainer,
+              fontSize: 25,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
-      ),
+        const SizedBox(width: 12),
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'AtelierPro',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              'Le carnet de commandes de votre atelier',
+              style: TextStyle(
+                fontSize: 12,
+                color: AtelierProColors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPolicyConsent() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: _acceptedPolicies,
+          onChanged: _loading
+              ? null
+              : (value) => setState(() => _acceptedPolicies = value ?? false),
+          visualDensity: VisualDensity.compact,
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('J’accepte les '),
+                _LegalLink(
+                  label: 'conditions d’utilisation',
+                  onTap: () => _openLegalPage('/conditions'),
+                ),
+                const Text(' et la '),
+                _LegalLink(
+                  label: 'politique de confidentialité',
+                  onTap: () => _openLegalPage('/confidentialite'),
+                ),
+                const Text('.'),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -347,98 +307,160 @@ class _AuthScreenState extends State<AuthScreen> {
       backgroundColor: AtelierProColors.sable,
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Image.asset(
-                      'assets/logo.png',
-                      width: 92,
-                      height: 92,
-                      fit: BoxFit.cover,
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight > 40
+                      ? constraints.maxHeight - 40
+                      : 0,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 430),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildBrandHeader(),
+                        const SizedBox(height: 16),
+                        AuthSegmentedControl(
+                          selected: _isSignUp,
+                          onSignInTap: () => _setSignUp(false),
+                          onSignUpTap: () => _setSignUp(true),
+                        ),
+                        if (!_isSignUp) ...[
+                          const SizedBox(height: 18),
+                          Text(
+                            _method == _AuthMethod.email
+                                ? 'Bon retour parmi nous'
+                                : 'Connexion par téléphone',
+                            style: const TextStyle(
+                              fontSize: 25,
+                              height: 1.2,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildMethodSelector(),
+                        ] else ...[
+                          const SizedBox(height: 18),
+                          const Text(
+                            'Ouvrez votre compte',
+                            style: TextStyle(
+                              fontSize: 25,
+                              height: 1.2,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Form(
+                          key: _formKey,
+                          child: _isSignUp || _method == _AuthMethod.email
+                              ? _buildEmailForm()
+                              : _buildPhoneForm(),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 12),
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                color: AtelierProColors.rougeAlerte,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (!_isSignUp) ...[
+                          const SizedBox(height: 14),
+                          const Row(
+                            children: [
+                              Expanded(child: Divider()),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 12),
+                                child: Text(
+                                  'ou',
+                                  style: TextStyle(
+                                    color: AtelierProColors.onSurfaceMuted,
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          OutlinedButton(
+                            onPressed: _loading ? null : _submitGoogle,
+                            child: const Text('Continuer avec Google'),
+                          ),
+                          const SizedBox(height: 32),
+                          _buildSecurityNote(),
+                        ],
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'AtelierPro',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 20),
-                // Sélecteur Email / Téléphone
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AtelierProColors.surfaceContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                          child: _MethodTab(
-                        label: 'Email',
-                        selected: _method == _AuthMethod.email,
-                        onTap: () => setState(() {
-                          _method = _AuthMethod.email;
-                          _error = null;
-                        }),
-                      )),
-                      Expanded(
-                          child: _MethodTab(
-                        label: 'Téléphone',
-                        selected: _method == _AuthMethod.phone,
-                        onTap: () => setState(() {
-                          _method = _AuthMethod.phone;
-                          _error = null;
-                        }),
-                      )),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Form(
-                  key: _formKey,
-                  child: _method == _AuthMethod.email
-                      ? _buildEmailForm()
-                      : _buildPhoneForm(),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!,
-                      style:
-                          const TextStyle(color: AtelierProColors.rougeAlerte)),
-                ],
-                const SizedBox(height: 12),
-                const Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('OU',
-                          style: TextStyle(
-                              color: AtelierProColors.onSurfaceMuted,
-                              fontSize: 12)),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _submitGoogle,
-                  icon: const Icon(Icons.g_mobiledata,
-                      size: 26, color: AtelierProColors.tertiary),
-                  label: const Text('Continuer avec Google'),
-                ),
-              ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMethodSelector() {
+    return Row(
+      children: [
+        _MethodChoice(
+          label: 'E-mail',
+          selected: _method == _AuthMethod.email,
+          onTap: () => setState(() {
+            _method = _AuthMethod.email;
+            _error = null;
+          }),
+        ),
+        const SizedBox(width: 8),
+        _MethodChoice(
+          label: 'Téléphone',
+          selected: _method == _AuthMethod.phone,
+          onTap: () => setState(() {
+            _method = _AuthMethod.phone;
+            _error = null;
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecurityNote() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AtelierProColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Icon(Icons.circle,
+                size: 8, color: AtelierProColors.statusDelivered),
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "Connexion protégée. Après plusieurs essais échoués, l'accès est suspendu quelques minutes pour protéger votre compte.",
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.45,
+                color: AtelierProColors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -447,102 +469,173 @@ class _AuthScreenState extends State<AuthScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          _isSignUp ? 'Créons ton atelier' : 'Bienvenue',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          _isSignUp
-              ? 'Créez votre compte pour configurer votre atelier'
-              : 'Connectez-vous pour gérer votre atelier',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AtelierProColors.onSurfaceVariant),
-        ),
-        const SizedBox(height: 20),
+        _fieldLabel('Adresse e-mail'),
         TextFormField(
           controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autocorrect: false,
+          autofillHints: const [AutofillHints.email],
           decoration: const InputDecoration(
-              labelText: 'Email',
-              prefixIcon: Icon(Icons.mail_outline, size: 20)),
-          validator: (v) =>
-              (v == null || !v.contains('@')) ? 'Email invalide' : null,
+            hintText: 'vous@exemple.com',
+          ),
+          validator: (v) {
+            final value = (v ?? '').trim();
+            if (value.isEmpty) return 'Entrez votre adresse e-mail.';
+            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(value)) {
+              return 'Adresse e-mail invalide.';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 12),
+        _fieldLabel('Mot de passe'),
         TextFormField(
           controller: _passwordCtrl,
           obscureText: !_passwordVisible,
+          textInputAction:
+              _isSignUp ? TextInputAction.next : TextInputAction.done,
+          autofillHints: _isSignUp
+              ? const [AutofillHints.newPassword]
+              : const [AutofillHints.password],
           decoration: InputDecoration(
-            labelText: 'Mot de passe',
-            prefixIcon: const Icon(Icons.lock_outline, size: 20),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _passwordVisible
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                size: 20,
-                color: AtelierProColors.onSurfaceVariant,
-              ),
-              tooltip: _passwordVisible ? 'Masquer' : 'Afficher',
+            hintText: _isSignUp ? '8 caractères minimum' : 'Votre mot de passe',
+            suffixIcon: TextButton(
               onPressed: () =>
                   setState(() => _passwordVisible = !_passwordVisible),
+              child: Text(_passwordVisible ? 'Masquer' : 'Afficher'),
             ),
           ),
-          validator: (v) =>
-              (v == null || v.length < 6) ? 'Minimum 6 caractères' : null,
+          validator: (v) {
+            final value = v ?? '';
+            if (value.isEmpty) return 'Entrez votre mot de passe.';
+            if (_isSignUp) {
+              final error =
+                  PasswordPolicy.validate(value, email: _emailCtrl.text.trim());
+              return error ?? null;
+            }
+            return null;
+          },
         ),
+        if (_isSignUp)
+          PasswordStrengthMeter(
+            password: _passwordCtrl.text,
+            email: _emailCtrl.text.trim(),
+          ),
         if (!_isSignUp)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-                onPressed: _forgotPassword,
-                style: TextButton.styleFrom(
-                  foregroundColor: AtelierProColors.primary,
-                  textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-                child: const Text('Mot de passe oublié ?')),
+              onPressed: _forgotPassword,
+              style: TextButton.styleFrom(
+                foregroundColor: AtelierProColors.secondary,
+                minimumSize: const Size(44, 44),
+              ),
+              child: const Text('Mot de passe oublié ?'),
+            ),
           ),
         if (_isSignUp) ...[
+          const SizedBox(height: 16),
+          _fieldLabel('Confirmer le mot de passe'),
+          TextFormField(
+            controller: _confirmPasswordCtrl,
+            obscureText: !_passwordVisible,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.newPassword],
+            decoration: const InputDecoration(
+              hintText: 'Retapez le mot de passe',
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Confirmez votre mot de passe.';
+              }
+              if (value != _passwordCtrl.text) {
+                return 'Les mots de passe ne correspondent pas.';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 8),
-          const Text(
-            'La configuration de votre atelier se fera juste après.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: AtelierProColors.onSurfaceMuted),
+          _buildPolicyConsent(),
+          if (!_acceptedPolicies)
+            const Padding(
+              padding: EdgeInsets.only(left: 12, top: 2),
+              child: Text(
+                'Cochez la case pour créer votre compte.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AtelierProColors.onSurfaceMuted,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AtelierProColors.secondaryFixed,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Étape suivante : ',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(
+                    text: 'après confirmation de votre e-mail, vous choisirez '
+                        'le métier de votre atelier. Ce choix est définitif '
+                        'pour ce compte.',
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: AtelierProColors.onSecondaryContainer,
+              ),
+            ),
           ),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         ElevatedButton(
-          onPressed: _loading ? null : _submitEmail,
+          onPressed: _loading || (_isSignUp && !_acceptedPolicies)
+              ? null
+              : _submitEmail,
           child: _loading
               ? const SizedBox(
                   height: 18,
                   width: 18,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white))
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(_isSignUp
-                        ? 'Créer mon compte et mon atelier'
-                        : 'Se connecter'),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward, size: 18),
-                  ],
-                ),
+              : Text(_isSignUp ? 'Créer mon compte' : 'Se connecter'),
         ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: () => setState(() => _isSignUp = !_isSignUp),
-          child: Text(_isSignUp
-              ? 'Déjà un compte ? Se connecter'
-              : "Pas encore de compte ? S'inscrire"),
-        ),
+        if (_isSignUp) ...[
+          const SizedBox(height: 44),
+          const Text(
+            'Un e-mail de confirmation vous sera envoyé.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AtelierProColors.onSurfaceVariant,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ],
     );
   }
+
+  Widget _fieldLabel(String label) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AtelierProColors.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
 
   Widget _buildPhoneForm() {
     return Column(
@@ -559,13 +652,15 @@ class _AuthScreenState extends State<AuthScreen> {
               ? 'Entre le code à 6 chiffres envoyé au ${normalizePhone(_phoneCtrl.text.trim())}'
               : 'Compte créé automatiquement à la première connexion',
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AtelierProColors.onSurfaceVariant, fontSize: 13),
+          style: const TextStyle(
+              color: AtelierProColors.onSurfaceVariant, fontSize: 13),
         ),
         const SizedBox(height: 20),
         if (!_codeSent) ...[
           TextFormField(
             controller: _phoneCtrl,
             keyboardType: TextInputType.phone,
+            autofillHints: const [AutofillHints.telephoneNumber],
             decoration: const InputDecoration(
               labelText: 'Numéro de téléphone',
               hintText: '90 12 34 56',
@@ -621,34 +716,75 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-class _MethodTab extends StatelessWidget {
+class _MethodChoice extends StatelessWidget {
+  const _MethodChoice({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _MethodTab(
-      {required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? AtelierProColors.surfaceContainerHigh
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AtelierProColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: selected
+                  ? AtelierProColors.primary
+                  : AtelierProColors.outlineVariant,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : AtelierProColors.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  const _LegalLink({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(
           label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected
-                ? AtelierProColors.primary
-                : AtelierProColors.onSurfaceVariant,
+          style: const TextStyle(
+            color: AtelierProColors.secondary,
+            decoration: TextDecoration.underline,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),

@@ -1,24 +1,32 @@
 rules_version = '2';
 
 // Règles de sécurité Firebase Storage — AtelierPro
-// À coller dans Firebase Console > Storage > Rules.
+// À déployer avec : firebase deploy --only storage
 // Structure des fichiers : {dossier}/{userId}/{clé}.{ext}
-//   - logos/{userId}/logo.jpg       (logo de l'atelier)
+//   - logos/{userId}/logo.jpg        (logo de l'atelier)
 //   - photos/{userId}/{clientId}.jpg (photo d'un client)
+//   - commandes/{userId}/...         (photos liées aux commandes)
+//   - modeles_etapes/{userId}/...    (photos explicatives des étapes)
 
 service firebase.storage {
   match /b/{bucket}/o {
+    // Connecté ET identité vérifiée (même logique que firestore.rules).
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && (request.auth.token.email_verified == true
+            || request.auth.token.firebase.sign_in_provider == 'phone');
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Image uniquement (JPEG, PNG, WebP), moins de 5 Mo. Le type est celui
+    // déclaré à l'envoi : l'app le fixe explicitement (voir StorageService).
     function isValidUpload() {
       return request.resource != null
-        && request.resource.size < 5 * 1024 * 1024;
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
 
     match /logos/{userId}/{fileName} {

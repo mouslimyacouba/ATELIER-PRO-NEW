@@ -36,6 +36,13 @@ class StorageService {
     return File(picked.path);
   }
 
+  /// Type MIME déclaré à l'envoi. Les règles Storage n'acceptent que des
+  /// images (JPEG, PNG, WebP). Le sélecteur d'image recompresse tout ce qui
+  /// n'est pas du PNG en JPEG (voir `pickImage`) : on déclare donc PNG pour
+  /// `.png` et JPEG pour le reste.
+  static String _contentTypeFor(String ext) =>
+      ext == 'png' ? 'image/png' : 'image/jpeg';
+
   /// Upload un fichier vers `bucket/userId/key.ext` (ex: bucket "logos" ou
   /// "photos" — de simples dossiers de premier niveau dans Firebase Storage,
   /// pas de vrais "buckets" séparés comme chez Supabase) et retourne l'URL
@@ -79,7 +86,10 @@ class StorageService {
 
     late final TaskSnapshot snapshot;
     try {
-      snapshot = await ref.putFile(file);
+      snapshot = await ref.putFile(
+        file,
+        SettableMetadata(contentType: _contentTypeFor(safeExt)),
+      );
     } on FirebaseException catch (e) {
       // Erreur la plus fréquente à ce stade : règles Storage non publiées
       // (unauthorized) ou bucket jamais initialisé — voir note en tête de

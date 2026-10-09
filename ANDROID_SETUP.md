@@ -45,24 +45,35 @@ echo %ANDROID_HOME%
 setx ANDROID_HOME "C:\Users\%USERNAME%\AppData\Local\Android\sdk"
 ```
 
-### 3️⃣ Vérifier la Clé SHA-1 de Debug
+### 3️⃣ Vérifier les empreintes de signature Android
 
 ```bash
-# Depuis le dossier android/
+# Depuis la racine du projet
 cd android
-./gradlew.bat signingReport
-
-# Regarder la ligne SHA1 pour androiddebugkey
+.\gradlew.bat signingReport
 ```
 
-### 4️⃣ Ajouter la SHA-1 à Firebase Console
+Relever les empreintes SHA-1 et SHA-256 des variantes `debug` et `release`.
+Le chemin `storeFile` dans `android/key.properties` est relatif au dossier
+`android/`; la clé release utilisée dans ce projet est `android/upload-keystore.jks`.
+
+### 4️⃣ Enregistrer les empreintes dans Firebase
 
 1. Aller sur https://console.firebase.google.com
 2. Sélectionner projet "atelier-pro-1a9e8"
 3. Paramètres → Vos apps → Android app
-4. Dans "Certificats SHA-1" → **Ajouter** votre SHA-1 trouvé à l'étape 3
+4. Ajouter les SHA-1 et SHA-256 de chaque certificat réellement utilisé.
+   Pour Google Play, ajouter aussi les empreintes du certificat **App signing**
+   affiché dans Play Console (il peut être différent de la clé d'upload).
+5. Dans Authentication → Méthode de connexion, vérifier que Google est activé.
 
 ### 5️⃣ Vérifier google-services.json
+
+Le package Android doit être `com.zinderdigital.atelierpro_mobile`. Le client
+OAuth Web doit correspondre à `FIREBASE_WEB_CLIENT_ID` dans `.env`; l'application
+l'utilise comme `serverClientId` pour obtenir l'ID token Firebase sur Android.
+Le `certificate_hash` d'un ancien `google-services.json` ne remplace pas
+l'enregistrement des empreintes actuelles dans Firebase Console / Google Cloud.
 
 ```bash
 # Le fichier doit être à :
@@ -168,31 +179,25 @@ flutter run -d [device-id]
 flutter build apk --release
 
 # APK générée à :
-# build/app/outputs/apk/release/app-release.apk (66 MB)
+# build/app/outputs/flutter-apk/app-release.apk
 
 # Installer sur appareil
-adb install -r build/app/outputs/apk/release/app-release.apk
+adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ## 📱 Configuration Google Sign-In Android
 
-Le fichier `google-services.json` contient déjà :
+Firebase est initialisé ici avec `FirebaseOptions` côté Flutter; le plugin
+Gradle `google-services` n'est donc pas appliqué. Ne déduisez pas le certificat
+utilisé par l'APK release depuis le `certificate_hash` d'un JSON local. Utilisez
+`signingReport`, puis enregistrez les empreintes de la clé release dans Firebase
+Console. `FIREBASE_WEB_CLIENT_ID` doit être le client OAuth de type Web du même
+projet Firebase.
 
-```json
-{
-  "oauth_client": [
-    {
-      "client_id": "569744918009-ogjta19p0d90pvtnu6qtst34vr4sftk6.apps.googleusercontent.com",
-      "android_info": {
-        "package_name": "com.zinderdigital.atelierpro_mobile",
-        "certificate_hash": "d0d0b2d528059c09cb31d5693a479a962768d8ec"  ← SHA-1 à vérifier
-      }
-    }
-  ]
-}
-```
-
-⚠️ **Important** : Le `certificate_hash` doit correspondre à votre SHA-1 debug.
+⚠️ **Important** : le type de build `release` est signé avec la clé release
+définie dans `android/key.properties`. N'utilisez pas une clé debug pour une
+distribution de production. Après un changement de certificat, Android peut
+exiger de désinstaller l'ancienne APK avant d'installer la nouvelle.
 
 ## 🔐 Clés de Signature
 
@@ -225,7 +230,7 @@ Le fichier `google-services.json` contient déjà :
 1. **Installer Java JDK** ← PRIORITÉ
 2. **Définir JAVA_HOME**
 3. **Exécuter `gradlew signingReport`**
-4. **Ajouter SHA-1 à Firebase**
+4. **Ajouter SHA-1 et SHA-256 debug/release à Firebase**
 5. **Test build debug**
 6. **Déployer sur appareil**
 
@@ -244,4 +249,3 @@ flutter build apk --debug -v
 ---
 
 **Note** : La clé release (`upload-keystore.jks`) est déjà configurée pour les builds production (voir `android/key.properties`).
-
