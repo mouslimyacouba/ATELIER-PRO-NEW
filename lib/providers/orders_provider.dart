@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/firestore_errors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import '../core/offline_save.dart';
+import '../core/sync_status.dart';
 import '../models/order.dart';
 import '../models/payment.dart';
 import '../models/historique_entry.dart';
@@ -47,10 +50,11 @@ class OrdersProvider extends ChangeNotifier {
   void _updateOrdersCaches() {
     // Recalcul du chiffre d'affaires total
     _cachedChiffreAffairesTotal =
-        _orders.fold(0, (sum, o) => sum + o.prixTotal);
+        _orders.fold(0, (total, o) => total + o.prixTotal);
 
     // Recalcul du montant restant dû
-    _cachedMontantRestantDu = _orders.fold(0, (sum, o) => sum + o.remaining);
+    _cachedMontantRestantDu =
+        _orders.fold(0, (total, o) => total + o.remaining);
 
     // Recalcul des commandes en retard
     final today = DateTime.now();
@@ -82,8 +86,8 @@ class OrdersProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> load(String userId) {
-    if (_currentUserId == userId && _ordersSub != null) {
+  Future<void> load(String userId, {bool forceRefresh = false}) {
+    if (!forceRefresh && _currentUserId == userId && _ordersSub != null) {
       return Future.value();
     }
     _currentUserId = userId;
@@ -91,6 +95,8 @@ class OrdersProvider extends ChangeNotifier {
     notifyListeners();
 
     final completer = Completer<void>();
+    final firstSnapshotTimer =
+        kDebugMode ? (Stopwatch()..start()) : null;
 
     _ordersSub?.cancel();
     _ordersSub = _firestore
@@ -108,6 +114,13 @@ class OrdersProvider extends ChangeNotifier {
         _loading = false;
         _error = null;
         notifyListeners();
+        if (firstSnapshotTimer != null && !completer.isCompleted) {
+          debugPrint(
+            '[PERF] commandes first snapshot: '
+            '${firstSnapshotTimer.elapsedMilliseconds}ms '
+            'cache=${snapshot.metadata.isFromCache} docs=${snapshot.docs.length}',
+          );
+        }
         NotificationService.syncReminders(_orders);
         if (!completer.isCompleted) completer.complete();
       },
@@ -163,6 +176,7 @@ class OrdersProvider extends ChangeNotifier {
 
   Future<String?> createOrder(AtelierOrder order,
       {StockProvider? stockProvider, List<String>? materiauxDefaut}) async {
+    final createStopwatch = kDebugMode ? (Stopwatch()..start()) : null;
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
 
@@ -190,36 +204,56 @@ class OrdersProvider extends ChangeNotifier {
       final nouveauNumeroLocal = maxNumeroActuel + 1;
 
       bool transactionSuccess = false;
+      var abandoned = false;
+      final connectivity = await Connectivity().checkConnectivity();
+      final writeLocally =
+          shouldWriteOrderLocally(connectivity);
 
-      // En ligne : tentative via transaction serveur (timeout court de 3s si réseau instable)
-      try {
-        await _firestore.runTransaction((transaction) async {
-          final compteurSnap = await transaction.get(compteurRef);
+      if (!writeLocally) {
+        try {
+          await _firestore
+              .runTransaction((transaction) async {
+            if (abandoned) throw StateError('transaction abandonnée');
+            final compteurSnap = await transaction.get(compteurRef);
+            if (abandoned) throw StateError('transaction abandonnée');
 
-          int nouveauNumero = nouveauNumeroLocal;
+            int nouveauNumero = nouveauNumeroLocal;
 
-          if (compteurSnap.exists && compteurSnap.data() != null) {
-            final dernier = (compteurSnap.data()!['dernierNumero'] as num? ?? 0).toInt();
-            nouveauNumero = (dernier >= maxNumeroActuel ? dernier : maxNumeroActuel) + 1;
-          }
+            if (compteurSnap.exists && compteurSnap.data() != null) {
+              final dernier =
+                  (compteurSnap.data()!['dernierNumero'] as num? ?? 0).toInt();
+              nouveauNumero =
+                  (dernier >= maxNumeroActuel ? dernier : maxNumeroActuel) + 1;
+            }
 
-          final map = order.toInsertMap();
-          map['numero'] = nouveauNumero;
+            final map = order.toInsertMap();
+            map['numero'] = nouveauNumero;
 
-          transaction.set(
-            compteurRef,
-            {
-              'dernierNumero': nouveauNumero,
-              'updatedAt': FieldValue.serverTimestamp(),
+            transaction.set(
+              compteurRef,
+              {
+                'dernierNumero': nouveauNumero,
+                'updatedAt': FieldValue.serverTimestamp(),
+              },
+              SetOptions(merge: true),
+            );
+
+            transaction.set(docRef, map);
+          })
+              .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              abandoned = true;
             },
-            SetOptions(merge: true),
           );
-
-          transaction.set(docRef, map);
-        }).timeout(const Duration(seconds: 3));
-        transactionSuccess = true;
-      } catch (e) {
-        debugPrint('Mode hors-ligne ou réseau instable ($e) : bascule sur écriture locale Firestore...');
+          transactionSuccess = !abandoned;
+        } catch (e) {
+          abandoned = true;
+          debugPrint(
+            'Mode hors-ligne ou réseau instable ($e) : '
+            'bascule sur écriture locale Firestore...',
+          );
+        }
       }
 
       if (!transactionSuccess) {
@@ -237,7 +271,10 @@ class OrdersProvider extends ChangeNotifier {
           },
           SetOptions(merge: true),
         );
-        await batch.commit();
+        await writeWithOfflineGrace(
+          () => batch.commit(),
+          onLocalWrite: SyncStatus.instance.onLocalWrite,
+        );
       }
 
       if (stockProvider != null &&
@@ -274,6 +311,13 @@ class OrdersProvider extends ChangeNotifier {
       debugPrint('============================');
 
       return e.toString();
+    } finally {
+      if (createStopwatch != null) {
+        debugPrint(
+          '[PERF] createOrder completed in '
+          '${createStopwatch.elapsedMilliseconds}ms',
+        );
+      }
     }
   }
 
@@ -285,24 +329,32 @@ class OrdersProvider extends ChangeNotifier {
     String? nouvelleValeur,
   }) async {
     if (ancienneValeur == nouvelleValeur) return;
-    await _firestore.collection('historique_modifications').add(
-          HistoriqueEntry(
-            id: '',
-            userId: userId,
-            commandeId: commandeId,
-            champModifie: champModifie,
-            ancienneValeur: ancienneValeur,
-            nouvelleValeur: nouvelleValeur,
-            createdAt: DateTime.now(),
-          ).toInsertMap(),
-        );
+    await writeWithOfflineGrace(
+      () => _firestore.collection('historique_modifications').add(
+            HistoriqueEntry(
+              id: '',
+              userId: userId,
+              commandeId: commandeId,
+              champModifie: champModifie,
+              ancienneValeur: ancienneValeur,
+              nouvelleValeur: nouvelleValeur,
+              createdAt: DateTime.now(),
+            ).toInsertMap(),
+          ),
+      onLocalWrite: SyncStatus.instance.onLocalWrite,
+    );
   }
 
   Future<String?> updateStatus(String orderId, OrderStatus status) async {
     try {
       final order = byId(orderId);
-      await _firestore.collection('commandes').doc(orderId).update(
-          {'statut': status.value, 'updatedAt': FieldValue.serverTimestamp()});
+      await writeWithOfflineGrace(
+        () => _firestore.collection('commandes').doc(orderId).update({
+          'statut': status.value,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       if (order != null && order.status != status) {
         await _enregistrerHistorique(
           userId: order.userId,
@@ -341,7 +393,10 @@ class OrdersProvider extends ChangeNotifier {
         if (etapesSnapshot != null) 'etapesSnapshot': etapesSnapshot,
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      await _firestore.collection('commandes').doc(orderId).update(changes);
+      await writeWithOfflineGrace(
+        () => _firestore.collection('commandes').doc(orderId).update(changes),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
 
       if (avant != null) {
         if (description != null) {
@@ -388,10 +443,13 @@ class OrdersProvider extends ChangeNotifier {
       final index = etapes.indexWhere((e) => e['id'] == etapeId);
       if (index == -1) return null;
       etapes[index] = {...etapes[index], 'terminee': terminee};
-      await _firestore.collection('commandes').doc(orderId).update({
-        'etapesSnapshot': etapes,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await writeWithOfflineGrace(
+        () => _firestore.collection('commandes').doc(orderId).update({
+          'etapesSnapshot': etapes,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -400,10 +458,13 @@ class OrdersProvider extends ChangeNotifier {
 
   Future<String?> addPhoto(String orderId, String url) async {
     try {
-      await _firestore.collection('commandes').doc(orderId).update({
-        'photoUrls': FieldValue.arrayUnion([url]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await writeWithOfflineGrace(
+        () => _firestore.collection('commandes').doc(orderId).update({
+          'photoUrls': FieldValue.arrayUnion([url]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -412,10 +473,13 @@ class OrdersProvider extends ChangeNotifier {
 
   Future<String?> removePhoto(String orderId, String url) async {
     try {
-      await _firestore.collection('commandes').doc(orderId).update({
-        'photoUrls': FieldValue.arrayRemove([url]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await writeWithOfflineGrace(
+        () => _firestore.collection('commandes').doc(orderId).update({
+          'photoUrls': FieldValue.arrayRemove([url]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -433,7 +497,10 @@ class OrdersProvider extends ChangeNotifier {
             _firestore.collection('historique_modifications').doc(h.id));
       }
       batch.delete(_firestore.collection('commandes').doc(orderId));
-      await batch.commit();
+      await writeWithOfflineGrace(
+        () => batch.commit(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -476,7 +543,10 @@ class OrdersProvider extends ChangeNotifier {
         'acompte': FieldValue.increment(amount),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      await batch.commit();
+      await writeWithOfflineGrace(
+        () => batch.commit(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);

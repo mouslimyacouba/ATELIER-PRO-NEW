@@ -1,7 +1,10 @@
 import 'dart:async';
 import '../core/firestore_errors.dart';
+import '../core/client_deletion_policy.dart';
+import '../core/offline_save.dart';
+import '../core/sync_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/client.dart';
 
 class ClientsProvider extends ChangeNotifier {
@@ -33,8 +36,8 @@ class ClientsProvider extends ChangeNotifier {
   /// Retourne un Future qui se termine dès la première donnée reçue (utile
   /// pour le pull-to-refresh), sans se désabonner : l'écoute reste active
   /// pour les mises à jour suivantes.
-  Future<void> load(String userId) {
-    if (_currentUserId == userId && _sub != null) {
+  Future<void> load(String userId, {bool forceRefresh = false}) {
+    if (!forceRefresh && _currentUserId == userId && _sub != null) {
       return Future.value(); // déjà abonné, rien à refaire
     }
     _currentUserId = userId;
@@ -42,6 +45,8 @@ class ClientsProvider extends ChangeNotifier {
     notifyListeners();
 
     final completer = Completer<void>();
+    final firstSnapshotTimer =
+        kDebugMode ? (Stopwatch()..start()) : null;
     _sub?.cancel();
     _sub = _firestore
         .collection('clients')
@@ -57,6 +62,13 @@ class ClientsProvider extends ChangeNotifier {
         _loading = false;
         _error = null;
         notifyListeners();
+        if (firstSnapshotTimer != null && !completer.isCompleted) {
+          debugPrint(
+            '[PERF] clients first snapshot: '
+            '${firstSnapshotTimer.elapsedMilliseconds}ms '
+            'cache=${snapshot.metadata.isFromCache} docs=${snapshot.docs.length}',
+          );
+        }
         if (!completer.isCompleted) completer.complete();
       },
       onError: (e) {
@@ -71,7 +83,10 @@ class ClientsProvider extends ChangeNotifier {
 
   Future<String?> addClient(AtelierClient client) async {
     try {
-      await _firestore.collection('clients').add(client.toInsertMap());
+      await writeWithOfflineGrace(
+        () => _firestore.collection('clients').add(client.toInsertMap()),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null; // l'écoute temps réel met à jour _clients automatiquement
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -92,7 +107,10 @@ class ClientsProvider extends ChangeNotifier {
     mapped['updatedAt'] = FieldValue.serverTimestamp();
 
     try {
-      await _firestore.collection('clients').doc(id).update(mapped);
+      await writeWithOfflineGrace(
+        () => _firestore.collection('clients').doc(id).update(mapped),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -102,52 +120,49 @@ class ClientsProvider extends ChangeNotifier {
   Future<String?> updatePhoto(String clientId, String photoUrl) =>
       updateClient(clientId, {'photo_url': photoUrl});
 
-  /// Supprime le client, ainsi que ses commandes, paiements et fiches
-  /// associés (Firestore ne fait aucune suppression en cascade automatique,
-  /// contrairement aux contraintes ON DELETE CASCADE de Postgres).
-  ///
-  /// ⚠️ `userId` est requis dans CHAQUE requête de recherche des documents à
-  /// supprimer (`where('userId', ...)` en plus de `where('clientId', ...)`),
-  /// pas juste dans la règle de sécurité elle-même. Sans ça, Firestore
-  /// rejette la lecture avec "permission-denied" : ses règles ne peuvent
-  /// autoriser une requête que si elles peuvent prouver, à partir des
-  /// conditions `where` de la requête elle-même, que tous les documents
-  /// retournés respecteront la règle — une requête filtrée seulement par
-  /// `clientId` ne suffit pas à le prouver, même si en pratique tous les
-  /// documents concernés appartiennent bien à l'utilisateur.
+  /// Le client est supprimable uniquement sans commande ni paiement associé.
+  /// Ses fiches de mesures sont supprimées avec lui, mais l'historique
+  /// comptable n'est jamais supprimé en cascade.
   Future<String?> deleteClient(String id, String userId) async {
     try {
-      final batch = _firestore.batch();
-
       final commandes = await _firestore
           .collection('commandes')
           .where('userId', isEqualTo: userId)
           .where('clientId', isEqualTo: id)
+          .limit(1)
           .get();
-      for (final c in commandes.docs) {
-        batch.delete(c.reference);
-      }
-
       final paiements = await _firestore
           .collection('paiements')
           .where('userId', isEqualTo: userId)
           .where('clientId', isEqualTo: id)
+          .limit(1)
           .get();
-      for (final p in paiements.docs) {
-        batch.delete(p.reference);
-      }
+      final blocked = clientDeletionBlockMessage(
+        orderCount: commandes.size,
+        paymentCount: paiements.size,
+      );
+      if (blocked != null) return blocked;
 
       final fiches = await _firestore
           .collection('fiches')
           .where('userId', isEqualTo: userId)
           .where('clientId', isEqualTo: id)
           .get();
-      for (final f in fiches.docs) {
-        batch.delete(f.reference);
-      }
 
-      batch.delete(_firestore.collection('clients').doc(id));
-      await batch.commit();
+      final refs = [
+        ...fiches.docs.map((fiche) => fiche.reference),
+        _firestore.collection('clients').doc(id),
+      ];
+      for (var i = 0; i < refs.length; i += 400) {
+        final batch = _firestore.batch();
+        for (final ref in refs.skip(i).take(400)) {
+          batch.delete(ref);
+        }
+        await writeWithOfflineGrace(
+          () => batch.commit(),
+          onLocalWrite: SyncStatus.instance.onLocalWrite,
+        );
+      }
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);

@@ -351,11 +351,11 @@ class _ModeleFormScreenState extends State<ModeleFormScreen> {
       fillColor: AtelierProColors.surfaceContainer,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: AtelierProColors.outlineVariant),
+        borderSide: const BorderSide(color: AtelierProColors.outlineVariant),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: AtelierProColors.outlineVariant),
+        borderSide: const BorderSide(color: AtelierProColors.outlineVariant),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

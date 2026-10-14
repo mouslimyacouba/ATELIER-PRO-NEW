@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
 
 final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
@@ -56,7 +55,6 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(error),
-          backgroundColor: AtelierProColors.rougeAlerte,
         ),
       );
       return;
@@ -69,6 +67,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -79,11 +78,11 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AtelierProColors.primary.withAlpha(20),
+              color: colors.primary.withAlpha(20),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.lock_reset_outlined,
-                color: AtelierProColors.primary, size: 22),
+            child:
+                Icon(Icons.lock_reset_outlined, color: colors.primary, size: 22),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -115,11 +114,13 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                 style: ElevatedButton.styleFrom(
                     minimumSize: const Size(140, 48)),
                 child: _sending
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 16,
                         width: 16,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: colors.onPrimary,
+                        ),
                       )
                     : const Text('Envoyer le lien'),
               ),
@@ -128,29 +129,30 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   }
 
   Widget _buildSent() {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AtelierProColors.statusDelivered.withAlpha(24),
+        color: colors.tertiaryContainer,
         borderRadius: BorderRadius.circular(12),
         border:
-            Border.all(color: AtelierProColors.statusDelivered.withAlpha(80)),
+            Border.all(color: colors.tertiary),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.mark_email_read_outlined,
-              color: AtelierProColors.tertiaryContainer, size: 24),
+          Icon(Icons.mark_email_read_outlined,
+              color: colors.onTertiaryContainer, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "Si un compte existe pour ${_emailCtrl.text.trim()}, un e-mail "
+              'Si un compte existe pour ${_emailCtrl.text.trim()}, un e-mail '
               "de réinitialisation vient d'être envoyé.\n\n"
               'Pensez à vérifier vos courriers indésirables.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 height: 1.4,
-                color: AtelierProColors.tertiaryContainer,
+                color: colors.onTertiaryContainer,
               ),
             ),
           ),
@@ -160,19 +162,20 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   }
 
   Widget _buildForm() {
+    final colors = Theme.of(context).colorScheme;
     return Form(
       key: _formKey,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Entrez votre adresse e-mail : nous vous enverrons un lien pour "
+          Text(
+            'Entrez votre adresse e-mail : nous vous enverrons un lien pour '
             'choisir un nouveau mot de passe.',
             style: TextStyle(
               fontSize: 13,
               height: 1.4,
-              color: AtelierProColors.onSurfaceVariant,
+              color: colors.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),

@@ -136,465 +136,512 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onRefresh: _loadAll,
               child: orders.loading && orders.orders.isEmpty
                   ? const AtelierSpinner()
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                  : Builder(
+                      builder: (context) {
+                        final dashboardItems = <WidgetBuilder>[
+                          (_) => Row(
                                 children: [
-                                  Text(
-                                    '${_salutation()}, Artisan 👋',
-                                    style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w700),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${_salutation()}, Artisan 👋',
+                                          style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w700),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          "Voici un résumé de votre activité aujourd'hui.",
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              color: AtelierProColors
+                                                  .onSurfaceVariant),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    "Voici un résumé de votre activité aujourd'hui.",
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color:
-                                            AtelierProColors.onSurfaceVariant),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AtelierProColors.statusDone
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: AtelierProColors.statusDone
-                                        .withValues(alpha: 0.4)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
                                   Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                        color: AtelierProColors.statusDone,
-                                        shape: BoxShape.circle),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text('En ligne',
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          color: AtelierProColors.statusDone,
-                                          fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        if (stock.itemsEnAlerte.isNotEmpty) ...[
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AtelierProColors.statusUrgent.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AtelierProColors.statusUrgent.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.warning_amber_rounded, color: AtelierProColors.statusUrgent, size: 20),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    '⚠️ ${stock.itemsEnAlerte.length} article(s) en stock faible (${stock.itemsEnAlerte.map((i) => i.nom).join(', ')})',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AtelierProColors.statusUrgent),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () => context.push('/stock'),
-                                  child: const Text('Voir'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
-                        // Strip "Aujourd'hui"
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AtelierProColors.surfaceContainer,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: AtelierProColors.outlineVariant),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('AUJOURD\'HUI',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                      color: AtelierProColors.onSurfaceVariant)),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _KpiValue(
-                                      value: '$commandesOuvertes',
-                                      label: 'commandes',
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AtelierProColors.statusDone
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                          color: AtelierProColors.statusDone
+                                              .withValues(alpha: 0.4)),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: _KpiValue(
-                                      value: '$aLivrerBientot',
-                                      label: 'à livrer',
-                                      color: AtelierProColors.statusPending,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _KpiValue(
-                                      value: '$commandesEnRetard',
-                                      label: 'en retard',
-                                      color: commandesEnRetard > 0
-                                          ? AtelierProColors.statusUrgent
-                                          : null,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: const BoxDecoration(
+                                              color:
+                                                  AtelierProColors.statusDone,
+                                              shape: BoxShape.circle),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Text('En ligne',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color:
+                                                    AtelierProColors.statusDone,
+                                                fontWeight: FontWeight.w600)),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 14),
-                                child: Divider(
-                                    height: 1,
-                                    color: AtelierProColors.outlineVariant),
-                              ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _KpiValue(
-                                      label: 'CA du mois',
-                                      value: _money.format(caDuMois),
-                                      big: true,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _KpiValue(
-                                      label: 'À récupérer',
-                                      value: _money.format(resteDuMois),
-                                      big: true,
-                                      color: AtelierProColors.statusPending,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _KpiValue(
-                                      label: 'Clients',
-                                      value: '${clients.clients.length}',
-                                      big: true,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                          (_) => const SizedBox(height: 16),
 
-                        // Carte "Recettes du mois"
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AtelierProColors.surfaceContainer,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: AtelierProColors.outlineVariant),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'RECETTES DU MOIS (${DateFormat('MMMM', 'fr_FR').format(now).toUpperCase()})',
-                                style: AtelierProTheme.dataStyle(
-                                    fontSize: 11,
-                                    color: AtelierProColors.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(_money.format(caDuMois),
-                                  style: AtelierProTheme.dataStyle(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w800)),
-                              const SizedBox(height: 14),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: progression,
-                                  minHeight: 8,
-                                  backgroundColor: AtelierProColors
-                                      .statusPending
-                                      .withValues(alpha: 0.25),
-                                  valueColor: const AlwaysStoppedAnimation(
-                                      AtelierProColors.statusDone),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _MiniStat(
-                                      dotColor: AtelierProColors.statusDone,
-                                      label: 'Acomptes perçus',
-                                      value: _money.format(acomptesDuMois),
-                                    ),
+                          if (stock.itemsEnAlerte.isNotEmpty) ...[
+                            (_) => Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AtelierProColors.statusUrgent
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: AtelierProColors.statusUrgent
+                                            .withValues(alpha: 0.3)),
                                   ),
-                                  Expanded(
-                                    child: _MiniStat(
-                                      dotColor: AtelierProColors.statusPending,
-                                      label: 'Reste à recouvrer',
-                                      value: _money.format(resteDuMois),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Grille de stats 2x2
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _StatTile(
-                                icon: Icons.content_cut,
-                                iconColor: AtelierProColors.primary,
-                                value:
-                                    '${orders.byStatus(OrderStatus.enCours).length}',
-                                label: 'Commandes en cours',
-                                badge: orders
-                                        .byStatus(OrderStatus.termine)
-                                        .isNotEmpty
-                                    ? '${orders.byStatus(OrderStatus.termine).length} prêtes'
-                                    : null,
-                                badgeColor: AtelierProColors.statusDone,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatTile(
-                                icon: Icons.local_shipping_outlined,
-                                iconColor: AtelierProColors.statusProgress,
-                                value: '${urgent.length}',
-                                label: 'Livraisons imminentes',
-                                badge: urgent.isNotEmpty ? 'Urgent' : null,
-                                badgeColor: AtelierProColors.statusUrgent,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _StatTile(
-                                icon: Icons.straighten,
-                                iconColor: AtelierProColors.secondary,
-                                value: '${fiches.fiches.length}',
-                                label: 'Fiches mesures',
-                                badge: null,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatTile(
-                                icon: Icons.people_outline,
-                                iconColor: AtelierProColors.tertiary,
-                                value: '${clients.clients.length}',
-                                label: 'Clients enregistrés',
-                                badge: null,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        const Text('ACTIONS RAPIDES',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5)),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _QuickAction(
-                                icon: Icons.add_circle_outline,
-                                label: 'Nouvelle',
-                                sublabel: 'Commande',
-                                filled: true,
-                                onTap: () => context.push('/commandes/nouvelle'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _QuickAction(
-                                icon: Icons.straighten_outlined,
-                                label: 'Prendre',
-                                sublabel: 'Mesures',
-                                onTap: () => context.go('/mesures'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _QuickAction(
-                                icon: Icons.person_add_outlined,
-                                label: 'Ajouter',
-                                sublabel: 'Client',
-                                onTap: () => context.go('/clients'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _QuickAction(
-                                icon: Icons.payments_outlined,
-                                label: 'Encaisser',
-                                sublabel: 'Paiement',
-                                onTap: () => context.go('/commandes'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        if (urgent.isNotEmpty) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.warning_amber_rounded,
                                           color: AtelierProColors.statusUrgent,
-                                          shape: BoxShape.circle)),
-                                  const SizedBox(width: 8),
-                                  const Text('Livraisons & Urgences',
+                                          size: 20),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          '⚠️ ${stock.itemsEnAlerte.length} article(s) en stock faible (${stock.itemsEnAlerte.map((i) => i.nom).join(', ')})',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AtelierProColors
+                                                  .statusUrgent),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => context.push('/stock'),
+                                        child: const Text('Voir'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                          ],
+
+                          // Strip "Aujourd'hui"
+                          (_) => Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AtelierProColors.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: AtelierProColors.outlineVariant),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('AUJOURD\'HUI',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5,
+                                            color: AtelierProColors
+                                                .onSurfaceVariant)),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _KpiValue(
+                                            value: '$commandesOuvertes',
+                                            label: 'commandes',
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _KpiValue(
+                                            value: '$aLivrerBientot',
+                                            label: 'à livrer',
+                                            color:
+                                                AtelierProColors.statusPending,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _KpiValue(
+                                            value: '$commandesEnRetard',
+                                            label: 'en retard',
+                                            color: commandesEnRetard > 0
+                                                ? AtelierProColors.statusUrgent
+                                                : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 14),
+                                      child: Divider(
+                                          height: 1,
+                                          color:
+                                              AtelierProColors.outlineVariant),
+                                    ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _KpiValue(
+                                            label: 'CA du mois',
+                                            value: _money.format(caDuMois),
+                                            big: true,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _KpiValue(
+                                            label: 'À récupérer',
+                                            value: _money.format(resteDuMois),
+                                            big: true,
+                                            color:
+                                                AtelierProColors.statusPending,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _KpiValue(
+                                            label: 'Clients',
+                                            value: '${clients.clients.length}',
+                                            big: true,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          (_) => const SizedBox(height: 12),
+
+                          // Carte "Recettes du mois"
+                          (_) => Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AtelierProColors.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: AtelierProColors.outlineVariant),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'RECETTES DU MOIS (${DateFormat('MMMM', 'fr_FR').format(now).toUpperCase()})',
+                                      style: AtelierProTheme.dataStyle(
+                                          fontSize: 11,
+                                          color:
+                                              AtelierProColors.onSurfaceVariant,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(_money.format(caDuMois),
+                                        style: AtelierProTheme.dataStyle(
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 14),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(999),
+                                      child: LinearProgressIndicator(
+                                        value: progression,
+                                        minHeight: 8,
+                                        backgroundColor: AtelierProColors
+                                            .statusPending
+                                            .withValues(alpha: 0.25),
+                                        valueColor:
+                                            const AlwaysStoppedAnimation(
+                                                AtelierProColors.statusDone),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _MiniStat(
+                                            dotColor:
+                                                AtelierProColors.statusDone,
+                                            label: 'Acomptes perçus',
+                                            value:
+                                                _money.format(acomptesDuMois),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _MiniStat(
+                                            dotColor:
+                                                AtelierProColors.statusPending,
+                                            label: 'Reste à recouvrer',
+                                            value: _money.format(resteDuMois),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          (_) => const SizedBox(height: 12),
+
+                          // Grille de stats 2x2
+                          (_) => Row(
+                                children: [
+                                  Expanded(
+                                    child: _StatTile(
+                                      icon: Icons.content_cut,
+                                      iconColor: AtelierProColors.primary,
+                                      value:
+                                          '${orders.byStatus(OrderStatus.enCours).length}',
+                                      label: 'Commandes en cours',
+                                      badge: orders
+                                              .byStatus(OrderStatus.termine)
+                                              .isNotEmpty
+                                          ? '${orders.byStatus(OrderStatus.termine).length} prêtes'
+                                          : null,
+                                      badgeColor: AtelierProColors.statusDone,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _StatTile(
+                                      icon: Icons.local_shipping_outlined,
+                                      iconColor:
+                                          AtelierProColors.statusProgress,
+                                      value: '${urgent.length}',
+                                      label: 'Livraisons imminentes',
+                                      badge:
+                                          urgent.isNotEmpty ? 'Urgent' : null,
+                                      badgeColor: AtelierProColors.statusUrgent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          (_) => const SizedBox(height: 12),
+                          (_) => Row(
+                                children: [
+                                  Expanded(
+                                    child: _StatTile(
+                                      icon: Icons.straighten,
+                                      iconColor: AtelierProColors.secondary,
+                                      value: '${fiches.fiches.length}',
+                                      label: 'Fiches mesures',
+                                      badge: null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _StatTile(
+                                      icon: Icons.people_outline,
+                                      iconColor: AtelierProColors.tertiary,
+                                      value: '${clients.clients.length}',
+                                      label: 'Clients enregistrés',
+                                      badge: null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          (_) => const SizedBox(height: 24),
+
+                          (_) => const Text('ACTIONS RAPIDES',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5)),
+                          (_) => const SizedBox(height: 10),
+                          (_) => Row(
+                                children: [
+                                  Expanded(
+                                    child: _QuickAction(
+                                      icon: Icons.add_circle_outline,
+                                      label: 'Nouvelle',
+                                      sublabel: 'Commande',
+                                      filled: true,
+                                      onTap: () =>
+                                          context.push('/commandes/nouvelle'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _QuickAction(
+                                      icon: Icons.straighten_outlined,
+                                      label: 'Prendre',
+                                      sublabel: 'Mesures',
+                                      onTap: () => context.go('/mesures'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          (_) => const SizedBox(height: 10),
+                          (_) => Row(
+                                children: [
+                                  Expanded(
+                                    child: _QuickAction(
+                                      icon: Icons.person_add_outlined,
+                                      label: 'Ajouter',
+                                      sublabel: 'Client',
+                                      onTap: () => context.go('/clients'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _QuickAction(
+                                      icon: Icons.payments_outlined,
+                                      label: 'Encaisser',
+                                      sublabel: 'Paiement',
+                                      onTap: () => context.go('/commandes'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          (_) => const SizedBox(height: 24),
+
+                          if (urgent.isNotEmpty) ...[
+                            (_) => Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: const BoxDecoration(
+                                                color: AtelierProColors
+                                                    .statusUrgent,
+                                                shape: BoxShape.circle)),
+                                        const SizedBox(width: 8),
+                                        const Text('Livraisons & Urgences',
+                                            style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w700)),
+                                      ],
+                                    ),
+                                    TextButton(
+                                      onPressed: () =>
+                                          context.push('/calendrier'),
+                                      child:
+                                          Text('Voir tout (${urgent.length})'),
+                                    ),
+                                  ],
+                                ),
+                            (_) => const SizedBox(height: 8),
+                            for (final order in urgent.take(3))
+                              (_) => _UrgentOrderCard(
+                                  order: order,
+                                  client: clients.byId(order.clientId)),
+                            (_) => const SizedBox(height: 24),
+                          ],
+
+                          if (recentPayments.isNotEmpty) ...[
+                            (_) => Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('DERNIERS ENCAISSEMENTS',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.5)),
+                                    TextButton(
+                                      onPressed: () =>
+                                          context.push('/historique/paiements'),
+                                      child: const Text('Journal de caisse',
+                                          style: TextStyle(fontSize: 12)),
+                                    ),
+                                  ],
+                                ),
+                            (_) => const SizedBox(height: 4),
+                            for (final p in recentPayments)
+                              (_) => Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: AtelierProColors
+                                            .statusDone
+                                            .withValues(alpha: 0.15),
+                                        child: const Icon(
+                                            Icons.payments_outlined,
+                                            size: 18,
+                                            color: AtelierProColors.statusDone),
+                                      ),
+                                      title: Text(
+                                        clients
+                                                .byId(orders
+                                                        .byId(p.commandeId)
+                                                        ?.clientId ??
+                                                    '')
+                                                ?.nomComplet ??
+                                            orders
+                                                .byId(p.commandeId)
+                                                ?.clientName ??
+                                            'Client',
+                                      ),
+                                      subtitle: Text(
+                                          '${p.modeLabel} · ${_dateShort.format(p.datePaiement)}',
+                                          style: const TextStyle(fontSize: 12)),
+                                      trailing: Text(
+                                          '+${_money.format(p.montant)}',
+                                          style: AtelierProTheme.dataStyle(
+                                              fontSize: 13,
+                                              color:
+                                                  AtelierProColors.statusDone)),
+                                    ),
+                                  ),
+                          ],
+
+                          (_) => const SizedBox(height: 8),
+                          (_) => Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Commandes récentes',
                                       style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700)),
+                                  TextButton(
+                                      onPressed: () => context.go('/commandes'),
+                                      child: const Text('Tout voir')),
                                 ],
                               ),
-                              TextButton(
-                                onPressed: () => context.push('/calendrier'),
-                                child: Text('Voir tout (${urgent.length})'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          for (final order in urgent.take(3))
-                            _UrgentOrderCard(
-                                order: order,
-                                client: clients.byId(order.clientId)),
-                          const SizedBox(height: 24),
-                        ],
-
-                        if (recentPayments.isNotEmpty) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('DERNIERS ENCAISSEMENTS',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5)),
-                              TextButton(
-                                onPressed: () => context.push('/historique/paiements'),
-                                child: const Text('Journal de caisse',
-                                    style: TextStyle(fontSize: 12)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          for (final p in recentPayments)
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AtelierProColors.statusDone
-                                      .withValues(alpha: 0.15),
-                                  child: const Icon(Icons.payments_outlined,
-                                      size: 18,
-                                      color: AtelierProColors.statusDone),
-                                ),
-                                title: Text(
-                                  clients
-                                          .byId(orders
-                                                  .byId(p.commandeId)
-                                                  ?.clientId ??
-                                              '')
-                                          ?.nomComplet ??
-                                      orders.byId(p.commandeId)?.clientName ??
-                                      'Client',
-                                ),
-                                subtitle: Text(
-                                    '${p.modeLabel} · ${_dateShort.format(p.datePaiement)}',
-                                    style: const TextStyle(fontSize: 12)),
-                                trailing: Text('+${_money.format(p.montant)}',
-                                    style: AtelierProTheme.dataStyle(
-                                        fontSize: 13,
-                                        color: AtelierProColors.statusDone)),
-                              ),
-                            ),
-                        ],
-
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Commandes récentes',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w700)),
-                            TextButton(
-                                onPressed: () => context.go('/commandes'),
-                                child: const Text('Tout voir')),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (orders.orders.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                                child: Text('Aucune commande pour le moment')),
-                          )
-                        else
-                          for (final order in orders.orders.take(5))
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                onTap: () =>
-                                    context.push('/commandes/${order.id}'),
-                                title: Text(order.clientName ?? 'Client'),
-                                subtitle: Text(order.description,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                trailing: StatusPill(
-                                    label: order.status.label,
-                                    color: order.status.color),
-                              ),
-                            ),
-                        const SizedBox(height: 80),
-                      ],
+                          (_) => const SizedBox(height: 8),
+                          if (orders.orders.isEmpty)
+                            (_) => const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: Center(
+                                      child: Text(
+                                          'Aucune commande pour le moment')),
+                                )
+                          else
+                            for (final order in orders.orders.take(5))
+                              (_) => Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      onTap: () => context
+                                          .push('/commandes/${order.id}'),
+                                      title: Text(order.clientName ?? 'Client'),
+                                      subtitle: Text(order.description,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                      trailing: StatusPill(
+                                          label: order.status.label,
+                                          color: order.status.color),
+                                    ),
+                                  ),
+                          (_) => const SizedBox(height: 80),
+                        ];
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: dashboardItems.length,
+                          itemBuilder: (context, index) =>
+                              dashboardItems[index](context),
+                        );
+                      },
                     ),
             ),
           ),
@@ -844,7 +891,7 @@ class _UrgentOrderCard extends StatelessWidget {
                 Text('Reste : ${_money.format(order.remaining)}',
                     style: AtelierProTheme.dataStyle(
                         fontSize: 12, color: AtelierProColors.statusPending)),
-                ],
+              ],
             ),
             if (client?.telephone case final telephone?) ...[
               const SizedBox(height: 10),

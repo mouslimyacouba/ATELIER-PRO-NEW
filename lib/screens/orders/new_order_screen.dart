@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme.dart';
 import '../../models/order.dart';
 import '../../models/modele_fabrication.dart';
 import '../../providers/atelier_provider.dart';
@@ -45,7 +44,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   String? _ficheMesureId;
   DateTime? _dateEcheance;
   bool _loading = false;
-  String? _error;
 
   @override
   void initState() {
@@ -61,7 +59,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     _coutMateriauxCtrl.dispose();
     _coutMainDoeuvreCtrl.dispose();
     _coutTransportCtrl.dispose();
-    for (var c in _dynamicControllers.values) c.dispose();
+    for (var c in _dynamicControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -106,7 +106,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Atelier non chargé. Veuillez réessayer.'),
-          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -114,7 +113,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
     setState(() {
       _loading = true;
-      _error = null;
     });
 
     try {
@@ -189,7 +187,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       if (!mounted) return;
 
       if (result == null) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+        });
         if (!mounted) return;
         if (context.canPop()) {
           context.pop();
@@ -199,13 +199,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       } else {
         setState(() {
           _loading = false;
-          _error = result;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur : $result'),
-            backgroundColor: Colors.red,
           ),
         );
       }
@@ -214,13 +212,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
       setState(() {
         _loading = false;
-        _error = e.toString();
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur : $e'),
-          backgroundColor: Colors.red,
         ),
       );
     }
@@ -229,7 +225,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AtelierProColors.surface,
       appBar: _buildHeader(),
       body: Form(key: _formKey, child: _buildCurrentStepView()),
       bottomNavigationBar: _buildBottomNav(),
@@ -239,7 +234,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   PreferredSizeWidget _buildHeader() {
     return AppBar(
       title: const Text('Nouvelle Commande'),
-      backgroundColor: AtelierProColors.surfaceContainer,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
@@ -269,9 +263,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final modeles = modelesProvider.modeles;
     return Column(children: [
       DropdownButtonFormField<String>(
-        value: _clientId,
+        initialValue: _clientId,
         decoration: const InputDecoration(
-            labelText: 'Client *', border: OutlineInputBorder()),
+          labelText: 'Client *',
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        ),
         items: clients
             .map(
                 (c) => DropdownMenuItem(value: c.id, child: Text(c.nomComplet)))
@@ -298,19 +295,23 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         )
       else
         DropdownButtonFormField<String>(
-          value: _modeleId,
+          initialValue: _modeleId,
           decoration: const InputDecoration(
-              labelText: 'Modèle (optionnel)', border: OutlineInputBorder()),
+            labelText: 'Modèle (optionnel)',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          ),
           items: [
             const DropdownMenuItem(value: null, child: Text('Aucun')),
             ...modeles
                 .map((m) => DropdownMenuItem(value: m.id, child: Text(m.nom)))
           ],
           onChanged: (v) {
-            if (v != null)
+            if (v != null) {
               _appliquerModele(modeles.firstWhere((m) => m.id == v));
-            else
+            } else {
               setState(() => _modeleId = null);
+            }
           },
         ),
     ]);
@@ -318,8 +319,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Widget _buildSpecsStep() {
     final metierConfig = context.watch<MetierProvider>().config;
-    if (metierConfig == null || metierConfig.champs.isEmpty)
+    if (metierConfig == null || metierConfig.champs.isEmpty) {
       return const Text('Aucune spécification requise.');
+    }
     return DynamicFieldsForm(
         fields: metierConfig.champs,
         controllers: _dynamicControllers,
@@ -327,6 +329,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   }
 
   Widget _buildFabStep() {
+    final colors = Theme.of(context).colorScheme;
     final fiches = _clientId == null
         ? <dynamic>[]
         : context.watch<FichesMesuresProvider>().forClient(_clientId!);
@@ -347,7 +350,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       children: [
         if (fiches.isNotEmpty) ...[
           DropdownButtonFormField<String>(
-            value: _ficheMesureId,
+            initialValue: _ficheMesureId,
             decoration: const InputDecoration(
                 labelText: 'Fiche liée', border: OutlineInputBorder()),
             items: fiches
@@ -400,12 +403,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           },
         ),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'ESTIMATION DES COÛTS & MARGE',
           style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: AtelierProColors.terracotta,
+              color: colors.primary,
               letterSpacing: 0.5),
         ),
         const SizedBox(height: 12),
@@ -440,13 +443,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: benefice >= 0
-                ? Colors.green.withValues(alpha: 0.08)
-                : Colors.red.withValues(alpha: 0.08),
+                ? colors.tertiaryContainer
+                : colors.errorContainer,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: benefice >= 0
-                    ? Colors.green.withValues(alpha: 0.3)
-                    : Colors.red.withValues(alpha: 0.3)),
+                color: benefice >= 0 ? colors.tertiary : colors.error),
           ),
           child: Column(
             children: [
@@ -472,14 +473,18 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: benefice >= 0 ? Colors.green : Colors.red),
+                        color: benefice >= 0
+                            ? colors.onTertiaryContainer
+                            : colors.onErrorContainer),
                   ),
                   Text(
                     '${benefice.toStringAsFixed(0)} FCFA',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
-                        color: benefice >= 0 ? Colors.green : Colors.red),
+                        color: benefice >= 0
+                            ? colors.onTertiaryContainer
+                            : colors.onErrorContainer),
                   ),
                 ],
               ),
@@ -490,11 +495,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         ListTile(
           title: Text(_dateEcheance == null
               ? "Date d'échéance / livraison"
-              : "Livraison : ${_dateEcheance!.day}/${_dateEcheance!.month}/${_dateEcheance!.year}"),
+              : 'Livraison : ${_dateEcheance!.day}/${_dateEcheance!.month}/${_dateEcheance!.year}'),
           trailing: const Icon(Icons.calendar_today),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: AtelierProColors.outlineVariant)),
+              side: BorderSide(color: colors.outlineVariant)),
           onTap: _pickDate,
         ),
       ],
@@ -502,11 +507,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   }
 
   Widget _buildBottomNav() {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: AtelierProColors.surfaceContainerHigh,
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHigh,
+        boxShadow: [
+          BoxShadow(color: colors.shadow.withValues(alpha: 0.16), blurRadius: 4),
+        ],
       ),
       child: Row(children: [
         if (_currentStep != NewOrderStep.clientMetier)
@@ -520,11 +528,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             minimumSize: const Size(120, 48),
           ),
           onPressed: () {
-            if (_currentStep == NewOrderStep.fabricationAcompte)
+            if (_currentStep == NewOrderStep.fabricationAcompte) {
               _submit();
-            else
+            } else {
               setState(() =>
                   _currentStep = NewOrderStep.values[_currentStep.index + 1]);
+            }
           },
           child: Text(_currentStep == NewOrderStep.fabricationAcompte
               ? 'CRÉER'

@@ -1,8 +1,13 @@
- import 'dart:async';
-import '../core/firestore_errors.dart';
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../core/atelier_listener_policy.dart';
+import '../core/firestore_errors.dart';
+import '../core/offline_save.dart';
+import '../core/sync_status.dart';
 import '../models/atelier.dart';
 
 class AtelierProvider extends ChangeNotifier {
@@ -10,6 +15,9 @@ class AtelierProvider extends ChangeNotifier {
   final _firestore = FirebaseFirestore.instance;
   StreamSubscription<User?>? _authSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _atelierSub;
+  String? _listeningUid;
+  bool _listenerFailed = false;
+  bool _verifiedWhenListening = false;
 
   Atelier? _atelier;
   bool _loading = true;
@@ -26,25 +34,43 @@ class AtelierProvider extends ChangeNotifier {
     // valeur connue depuis le cache local si le réseau est indisponible,
     // puis met à jour automatiquement dès que la synchro reprend — pas
     // besoin de bouton "recharger".
-    if (_auth.currentUser != null) {
-      _listen(_auth.currentUser!.uid);
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      _listen(currentUser);
     } else {
       _loading = false;
     }
-    _authSub = _auth.authStateChanges().listen((user) {
-      if (user != null) {
-        _listen(user.uid);
-      } else {
+    _authSub = _auth.userChanges().listen((user) {
+      if (user == null) {
+        _listeningUid = null;
         reset();
+        return;
+      }
+
+      if (shouldRestartAtelierListener(
+        userId: user.uid,
+        listeningUserId: _listeningUid,
+        listenerFailed: _listenerFailed,
+        verifiedWhenListening: _verifiedWhenListening,
+        userIsVerified: _isVerified(user),
+      )) {
+        _listen(user);
       }
     });
   }
 
-  void _listen(String userId) {
+  static bool _isVerified(User user) =>
+      user.emailVerified || user.email == null;
+
+  void _listen(User user) {
+    _listeningUid = user.uid;
+    _verifiedWhenListening = _isVerified(user);
+    _listenerFailed = false;
     _loading = true;
     notifyListeners();
     _atelierSub?.cancel();
-    _atelierSub = _firestore.collection('ateliers').doc(userId).snapshots().listen(
+    _atelierSub =
+        _firestore.collection('ateliers').doc(user.uid).snapshots().listen(
       (doc) {
         _atelier = doc.exists ? Atelier.fromMap(doc.id, doc.data()!) : null;
         _loading = false;
@@ -52,6 +78,7 @@ class AtelierProvider extends ChangeNotifier {
         notifyListeners();
       },
       onError: (e) {
+        _listenerFailed = true;
         _error = friendlyFirestoreError(e);
         _loading = false;
         notifyListeners();
@@ -95,21 +122,39 @@ class AtelierProvider extends ChangeNotifier {
       };
 
       try {
-        await docRef.set(atelierData, SetOptions(merge: true));
+        await writeWithOfflineGrace(
+          () => docRef.set(atelierData, SetOptions(merge: true)),
+          onLocalWrite: SyncStatus.instance.onLocalWrite,
+        );
       } catch (e) {
         if (e is FirebaseException && e.code == 'permission-denied') {
           // Attente de propagation transitoire du jeton d'authentification (cas nouveau compte)
           await Future.delayed(const Duration(milliseconds: 600));
           await _auth.currentUser?.reload();
-          await docRef.set(atelierData, SetOptions(merge: true));
+          await writeWithOfflineGrace(
+            () => docRef.set(atelierData, SetOptions(merge: true)),
+            onLocalWrite: SyncStatus.instance.onLocalWrite,
+          );
         } else {
           rethrow;
         }
       }
 
-      // Pas besoin de mettre à jour `_atelier` manuellement : l'écoute
-      // temps réel (_listen) reçoit ce changement automatiquement, y
-      // compris hors ligne (écriture locale reflétée immédiatement).
+      final nowLocal = DateTime.now();
+      _atelier = Atelier(
+        id: userId,
+        userId: userId,
+        nomAtelier: nomAtelier,
+        specialite: specialite,
+        telephone: telephone,
+        ville: ville,
+        logoUrl: null,
+        createdAt: nowLocal,
+        updatedAt: nowLocal,
+      );
+      _loading = false;
+      _error = null;
+      notifyListeners();
       return null;
     } catch (e) {
       debugPrint('[AtelierProvider] Erreur createAtelier : $e');
@@ -127,7 +172,8 @@ class AtelierProvider extends ChangeNotifier {
       'logo_url': 'logoUrl',
     };
     final mapped = {
-      for (final entry in changes.entries) (keyMap[entry.key] ?? entry.key): entry.value,
+      for (final entry in changes.entries)
+        (keyMap[entry.key] ?? entry.key): entry.value,
     };
     // Le métier se choisit une seule fois à la création; les règles Firestore
     // empêchent également sa modification côté serveur.
@@ -135,14 +181,18 @@ class AtelierProvider extends ChangeNotifier {
     mapped['updatedAt'] = FieldValue.serverTimestamp();
 
     try {
-      await _firestore.collection('ateliers').doc(_atelier!.id).update(mapped);
+      await writeWithOfflineGrace(
+        () => _firestore.collection('ateliers').doc(_atelier!.id).update(mapped),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
     }
   }
 
-  Future<String?> updateLogo(String logoUrl) => updateAtelier({'logo_url': logoUrl});
+  Future<String?> updateLogo(String logoUrl) =>
+      updateAtelier({'logo_url': logoUrl});
 
   /// Supprime toutes les données liées avant l'atelier. Le compte Firebase
   /// Auth est supprimé ensuite par `AuthProvider.deleteAccount`, pendant que
@@ -164,8 +214,14 @@ class AtelierProvider extends ChangeNotifier {
         _deleteAllWhereUserId('modeles', userId),
         _deleteAllWhereUserId('historique_modifications', userId),
       ]);
-      await _firestore.collection('compteurs').doc(userId).delete();
-      await _firestore.collection('ateliers').doc(userId).delete();
+      await writeWithOfflineGrace(
+        () => _firestore.collection('compteurs').doc(userId).delete(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
+      await writeWithOfflineGrace(
+        () => _firestore.collection('ateliers').doc(userId).delete(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -173,20 +229,29 @@ class AtelierProvider extends ChangeNotifier {
   }
 
   Future<void> _deleteAllWhereUserId(String collection, String userId) async {
-    final snapshot = await _firestore.collection(collection).where('userId', isEqualTo: userId).get();
+    final snapshot = await _firestore
+        .collection(collection)
+        .where('userId', isEqualTo: userId)
+        .get();
     // Firestore limite un batch à 500 opérations : on découpe par sécurité.
     for (var i = 0; i < snapshot.docs.length; i += 400) {
       final batch = _firestore.batch();
       for (final doc in snapshot.docs.skip(i).take(400)) {
         batch.delete(doc.reference);
       }
-      await batch.commit();
+      await writeWithOfflineGrace(
+        () => batch.commit(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
     }
   }
 
   void reset() {
     _atelierSub?.cancel();
     _atelier = null;
+    _listeningUid = null;
+    _listenerFailed = false;
+    _verifiedWhenListening = false;
     _loading = false;
     notifyListeners();
   }

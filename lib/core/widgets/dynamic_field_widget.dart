@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../config/metier_config.dart';
-import '../theme.dart';
 
 final _dateFormat = DateFormat('dd/MM/yyyy');
 
@@ -55,7 +54,6 @@ class _DynamicFieldWidgetState extends State<DynamicFieldWidget> {
         return _BoolFieldWidget(field: widget.field, controller: widget.controller);
 
       case TypeChampMetier.text:
-      default:
         return _buildTextField(context);
     }
   }
@@ -106,12 +104,13 @@ class _DynamicFieldWidgetState extends State<DynamicFieldWidget> {
   }
 
   Widget _buildSelectField(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return DropdownButtonFormField<String>(
-      value: widget.controller.text.isEmpty ? null : widget.controller.text,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AtelierProColors.primary),
+      initialValue: widget.controller.text.isEmpty ? null : widget.controller.text,
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: colors.primary),
       style: TextStyle(
         fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
-        color: AtelierProColors.onSurface,
+        color: colors.onSurface,
         fontSize: 15,
         fontWeight: FontWeight.w600,
       ),
@@ -174,14 +173,15 @@ class _UnitSwitcherPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final units = ['cm', 'in', 'mm'];
     return Container(
       height: 32,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: AtelierProColors.surfaceContainerLow,
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AtelierProColors.outlineVariant, width: 0.8),
+        border: Border.all(color: colors.outlineVariant, width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -193,7 +193,7 @@ class _UnitSwitcherPill extends StatelessWidget {
               duration: const Duration(milliseconds: 150),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? AtelierProColors.primaryContainer : Colors.transparent,
+                color: isSelected ? colors.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -201,7 +201,7 @@ class _UnitSwitcherPill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white : AtelierProColors.onSurfaceVariant,
+                  color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
                 ),
               ),
             ),
@@ -231,19 +231,6 @@ class _DateFieldWidget extends StatelessWidget {
       initialDate: initial,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AtelierProColors.primaryContainer,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: AtelierProColors.onSurface,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       controller.text = picked.toIso8601String().substring(0, 10);
@@ -252,6 +239,7 @@ class _DateFieldWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -272,7 +260,8 @@ class _DateFieldWidget extends StatelessWidget {
               labelText: field.label,
               errorText: state.errorText,
               suffixIcon: IconButton(
-                icon: const Icon(Icons.calendar_today_rounded, size: 20, color: AtelierProColors.secondaryContainer),
+                icon: Icon(Icons.calendar_today_rounded,
+                    size: 20, color: colors.primary),
                 onPressed: () => _pickDate(context),
               ),
             ),
@@ -285,7 +274,7 @@ class _DateFieldWidget extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: display.isEmpty ? FontWeight.w400 : FontWeight.w600,
-                    color: display.isEmpty ? AtelierProColors.onSurfaceMuted : AtelierProColors.onSurface,
+                    color: display.isEmpty ? colors.onSurfaceVariant : colors.onSurface,
                   ),
                 ),
               ),
@@ -304,6 +293,7 @@ class _BoolFieldWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
@@ -317,10 +307,10 @@ class _BoolFieldWidget extends StatelessWidget {
               padding: const EdgeInsets.only(left: 4.0, bottom: 6.0),
               child: Text(
                 field.label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AtelierProColors.onSurfaceVariant,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ),
@@ -329,10 +319,10 @@ class _BoolFieldWidget extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: isTrue ? AtelierProColors.primaryContainer : AtelierProColors.surfaceContainerLowest,
-                      foregroundColor: isTrue ? Colors.white : AtelierProColors.onSurface,
+                      backgroundColor: isTrue ? colors.primary : colors.surface,
+                      foregroundColor: isTrue ? colors.onPrimary : colors.onSurface,
                       side: BorderSide(
-                        color: isTrue ? AtelierProColors.primaryContainer : AtelierProColors.outlineVariant,
+                        color: isTrue ? colors.primary : colors.outlineVariant,
                         width: 1,
                       ),
                       minimumSize: const Size.fromHeight(44),
@@ -342,7 +332,9 @@ class _BoolFieldWidget extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (isTrue) const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                        if (isTrue)
+                          Icon(Icons.check_circle_rounded,
+                              size: 16, color: colors.onPrimary),
                         if (isTrue) const SizedBox(width: 6),
                         const Text('Oui', style: TextStyle(fontWeight: FontWeight.w700)),
                       ],
@@ -353,10 +345,12 @@ class _BoolFieldWidget extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: isFalse ? AtelierProColors.surfaceContainerHigh : AtelierProColors.surfaceContainerLowest,
-                      foregroundColor: isFalse ? AtelierProColors.onSurface : AtelierProColors.onSurface,
+                      backgroundColor: isFalse
+                          ? colors.surfaceContainerHighest
+                          : colors.surface,
+                      foregroundColor: colors.onSurface,
                       side: BorderSide(
-                        color: isFalse ? AtelierProColors.primaryContainer : AtelierProColors.outlineVariant,
+                        color: isFalse ? colors.primary : colors.outlineVariant,
                         width: 1,
                       ),
                       minimumSize: const Size.fromHeight(44),
@@ -366,7 +360,9 @@ class _BoolFieldWidget extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (isFalse) const Icon(Icons.cancel_rounded, size: 16, color: AtelierProColors.onSurfaceVariant),
+                        if (isFalse)
+                          Icon(Icons.cancel_rounded,
+                              size: 16, color: colors.onSurfaceVariant),
                         if (isFalse) const SizedBox(width: 6),
                         const Text('Non', style: TextStyle(fontWeight: FontWeight.w700)),
                       ],
@@ -381,4 +377,3 @@ class _BoolFieldWidget extends StatelessWidget {
     );
   }
 }
-

@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../core/client_finance.dart';
 import '../../core/contact_actions.dart';
 import '../../core/currency_formatter.dart';
 import '../../core/storage_service.dart';
 import '../../core/theme.dart';
+import '../../models/client.dart';
 import '../../models/order.dart';
 import '../../models/payment.dart';
 import '../../providers/atelier_provider.dart';
 import '../../providers/clients_provider.dart';
+import '../../providers/fiches_mesures_provider.dart';
 import '../../providers/orders_provider.dart';
+import '../../widgets/empty_state.dart';
 import '../../widgets/spinner.dart';
+import 'widgets/client_finance_card.dart';
+import 'widgets/client_measure_section.dart';
 
 final _money = CurrencyFormatter.formatter;
 final _dateShort = DateFormat('dd/MM/yyyy');
@@ -34,10 +40,26 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     if (!_initialized) {
       _initialized = true;
       final userId = context.read<AtelierProvider>().atelier?.userId;
-      if (userId != null && context.read<OrdersProvider>().orders.isEmpty) {
+      if (userId != null) {
+        context.read<ClientsProvider>().load(userId);
         context.read<OrdersProvider>().load(userId);
+        context.read<FichesMesuresProvider>().load(userId);
       }
     }
+  }
+
+  Future<void> _editClient(AtelierClient client) async {
+    await context.push<bool>(
+      '/clients/${Uri.encodeComponent(client.id)}/modifier',
+    );
+  }
+
+  Future<void> _retryClientData(String userId) async {
+    await Future.wait([
+      context.read<ClientsProvider>().load(userId, forceRefresh: true),
+      context.read<OrdersProvider>().load(userId, forceRefresh: true),
+      context.read<FichesMesuresProvider>().load(userId, forceRefresh: true),
+    ]);
   }
 
   Future<void> _changePhoto() async {
@@ -47,7 +69,12 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     setState(() => _uploadingPhoto = true);
     try {
       final userId = context.read<AtelierProvider>().atelier?.userId;
-      if (userId == null) return;
+      if (userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Atelier introuvable. Réessaie après reconnexion.')),
+        );
+        return;
+      }
       final url = await StorageService.upload(
         bucket: 'photos',
         userId: userId,
@@ -74,7 +101,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer ce client ?'),
         content: Text(
-          '$clientName sera supprimé, ainsi que ses commandes et fiches associées. Cette action est irréversible.',
+          '$clientName et ses fiches de mesures seront supprimés si aucun '
+          'historique de commande ou de paiement ne lui est associé. Les '
+          'commandes et paiements ne seront jamais supprimés.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
@@ -88,8 +117,16 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     if (confirmed != true || !context.mounted) return;
 
     final userId = context.read<AtelierProvider>().atelier?.userId;
-    if (userId == null) return;
-    final error = await context.read<ClientsProvider>().deleteClient(widget.clientId, userId);
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Atelier introuvable. Réessaie après reconnexion.'),
+        ),
+      );
+      return;
+    }
+    final error =
+        await context.read<ClientsProvider>().deleteClient(widget.clientId, userId);
     if (!context.mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
@@ -104,14 +141,38 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final client = context.watch<ClientsProvider>().byId(widget.clientId);
+    final clientsProvider = context.watch<ClientsProvider>();
+    final client = clientsProvider.byId(widget.clientId);
     final ordersProvider = context.watch<OrdersProvider>();
-    final orders = ordersProvider.orders.where((o) => o.clientId == widget.clientId).toList();
-    final payments = ordersProvider.paymentsForClient(widget.clientId);
+    final fichesProvider = context.watch<FichesMesuresProvider>();
 
     if (client == null) {
-      return const Scaffold(body: AtelierSpinner());
+      if (clientsProvider.loading) {
+        return const Scaffold(body: AtelierSpinner());
+      }
+      return Scaffold(
+        appBar: AppBar(title: const Text('Client introuvable')),
+        body: ErrorState(
+          message: clientsProvider.error ??
+              'Ce client est introuvable ou n’est plus accessible.',
+          onRetry: () {
+            final userId = context.read<AtelierProvider>().atelier?.userId;
+            if (userId != null) _retryClientData(userId);
+          },
+        ),
+      );
     }
+
+    final orders = ordersProvider.orders
+        .where((order) =>
+            order.userId == client.userId && order.clientId == client.id)
+        .toList();
+    final payments = ordersProvider.payments
+        .where((payment) =>
+            payment.userId == client.userId && payment.clientId == client.id)
+        .toList();
+    final clientFiches = fichesProvider.forClient(client.id);
+    final finance = ClientFinanceSummary.fromOrders(orders);
 
     return Scaffold(
       appBar: AppBar(
@@ -128,7 +189,13 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Modifier le client',
+            onPressed: () => _editClient(client),
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_outline),
+            tooltip: 'Supprimer le client',
             onPressed: () => _confirmDelete(context, client.nomComplet),
           ),
         ],
@@ -212,6 +279,38 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             ),
           ),
           const SizedBox(height: 20),
+          if (ordersProvider.loading && orders.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Chargement des commandes…'),
+                  ],
+                ),
+              ),
+            )
+          else if (ordersProvider.error != null && orders.isEmpty)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.error_outline),
+                title: Text(ordersProvider.error!),
+                trailing: IconButton(
+                  tooltip: 'Réessayer',
+                  onPressed: () => _retryClientData(client.userId),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+            )
+          else
+            ClientFinanceCard(summary: finance),
+          const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -239,6 +338,22 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   trailing: StatusPill(label: order.status.label, color: order.status.color),
                 ),
               ),
+          const SizedBox(height: 12),
+          ClientMeasureSection(
+              fiches: clientFiches,
+              loading: fichesProvider.loading,
+              error: fichesProvider.error,
+              onRetry: () =>
+                  fichesProvider.load(client.userId, forceRefresh: true),
+              onAdd: () => context.push(
+                '/mesures/nouvelle?clientId=${Uri.encodeComponent(client.id)}',
+              ),
+              onOpenAll: () => context.push(
+                '/mesures?clientId=${Uri.encodeComponent(client.id)}',
+              ),
+              onOpenFiche: (fiche) =>
+                  context.push('/mesures/${Uri.encodeComponent(fiche.id)}'),
+          ),
           const SizedBox(height: 20),
           const Text('Historique', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),

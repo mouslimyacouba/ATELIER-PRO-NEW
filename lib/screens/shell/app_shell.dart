@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/connectivity_banner.dart';
-import '../../core/theme.dart';
 
 class AppShell extends StatelessWidget {
-  final Widget child;
-  const AppShell({super.key, required this.child});
+  const AppShell({
+    super.key,
+    required this.navigationShell,
+    this.connectivityBanner = const ConnectivityBanner(),
+  });
+
+  final StatefulNavigationShell navigationShell;
+  final Widget connectivityBanner;
 
   static const _tabs = [
-    ('/', Icons.storefront_outlined, Icons.storefront, 'Atelier'),
-    ('/clients', Icons.people_outline, Icons.people, 'Clients'),
-    ('/commandes', Icons.receipt_long_outlined, Icons.receipt_long, 'Commandes'),
-    ('/mesures', Icons.description_outlined, Icons.description, 'Fiches'),
-    ('/parametres', Icons.settings_outlined, Icons.settings, 'Réglages'),
+    (Icons.storefront_outlined, Icons.storefront, 'Atelier'),
+    (Icons.people_outline, Icons.people, 'Clients'),
+    (Icons.receipt_long_outlined, Icons.receipt_long, 'Commandes'),
+    (Icons.description_outlined, Icons.description, 'Fiches'),
+    (Icons.settings_outlined, Icons.settings, 'Réglages'),
   ];
-
-  int _currentIndex(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    final idx = _tabs.indexWhere((t) => t.$1 == location);
-    return idx == -1 ? 0 : idx;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final currentIndex = _currentIndex(context);
+    final currentIndex = navigationShell.currentIndex;
 
     return PopScope(
       canPop: false,
@@ -34,7 +34,7 @@ class AppShell extends StatelessWidget {
         if (router.canPop()) {
           router.pop();
         } else if (currentIndex != 0) {
-          context.go('/');
+          navigationShell.goBranch(0);
         } else {
           SystemNavigator.pop();
         }
@@ -43,22 +43,23 @@ class AppShell extends StatelessWidget {
         body: SafeArea(
           child: Column(
             children: [
-              const ConnectivityBanner(),
-              Expanded(child: child),
+              connectivityBanner,
+              Expanded(child: navigationShell),
             ],
           ),
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: currentIndex,
-          onDestinationSelected: (i) => context.go(_tabs[i].$1),
-          backgroundColor: AtelierProColors.surfaceContainer,
-          indicatorColor: AtelierProColors.secondaryContainer,
+          onDestinationSelected: (index) => navigationShell.goBranch(
+            index,
+            initialLocation: index == currentIndex,
+          ),
           destinations: [
             for (final tab in _tabs)
               NavigationDestination(
-                icon: Icon(tab.$2, color: AtelierProColors.onSurfaceVariant),
-                selectedIcon: Icon(tab.$3, color: AtelierProColors.primary),
-                label: tab.$4,
+                icon: Icon(tab.$1),
+                selectedIcon: Icon(tab.$2),
+                label: tab.$3,
               ),
           ],
         ),

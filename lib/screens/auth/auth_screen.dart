@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/contact_actions.dart';
 import '../../core/password_policy.dart';
-import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
 import 'forgot_password_dialog.dart';
 import 'widgets/auth_segmented_control.dart';
@@ -225,6 +224,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildBrandHeader() {
+    final colors = Theme.of(context).colorScheme;
     return Row(
       children: [
         Container(
@@ -232,34 +232,36 @@ class _AuthScreenState extends State<AuthScreen> {
           height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: AtelierProColors.primary,
+            color: colors.primary,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Text(
+          child: Text(
             'A',
             style: TextStyle(
-              color: AtelierProColors.secondaryContainer,
+              color: colors.onPrimary,
               fontSize: 25,
               fontWeight: FontWeight.w800,
             ),
           ),
         ),
         const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AtelierPro',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-            ),
-            Text(
-              'Le carnet de commandes de votre atelier',
-              style: TextStyle(
-                fontSize: 12,
-                color: AtelierProColors.onSurfaceVariant,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'AtelierPro',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
-            ),
-          ],
+              Text(
+                'Le carnet de commandes de votre atelier',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -301,19 +303,68 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Widget _buildGoogleSection({required bool signingUp}) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text('ou', style: TextStyle(color: colors.onSurfaceVariant)),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: 14),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: colors.surface,
+            foregroundColor: colors.onSurface,
+          ),
+          onPressed: _loading ? null : _submitGoogle,
+          child: Text(
+            signingUp ? "S'inscrire avec Google" : 'Continuer avec Google',
+          ),
+        ),
+        if (signingUp) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text('En continuant avec Google, vous acceptez les '),
+              _LegalLink(
+                label: "conditions d'utilisation",
+                onTap: () => _openLegalPage('/conditions'),
+              ),
+              const Text(' et la '),
+              _LegalLink(
+                label: 'politique de confidentialité',
+                onTap: () => _openLegalPage('/confidentialite'),
+              ),
+              const Text('.'),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AtelierProColors.sable,
       body: SafeArea(
         child: Center(
           child: LayoutBuilder(
             builder: (context, constraints) => SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: constraints.maxHeight > 40
-                      ? constraints.maxHeight - 40
+                      ? constraints.maxHeight - 52
                       : 0,
                 ),
                 child: Center(
@@ -367,36 +418,19 @@ class _AuthScreenState extends State<AuthScreen> {
                             liveRegion: true,
                             child: Text(
                               _error!,
-                              style: const TextStyle(
-                                color: AtelierProColors.rougeAlerte,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
                               ),
                             ),
                           ),
                         ],
                         if (!_isSignUp) ...[
-                          const SizedBox(height: 14),
-                          const Row(
-                            children: [
-                              Expanded(child: Divider()),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  'ou',
-                                  style: TextStyle(
-                                    color: AtelierProColors.onSurfaceMuted,
-                                  ),
-                                ),
-                              ),
-                              Expanded(child: Divider()),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          OutlinedButton(
-                            onPressed: _loading ? null : _submitGoogle,
-                            child: const Text('Continuer avec Google'),
-                          ),
+                          _buildGoogleSection(signingUp: false),
                           const SizedBox(height: 32),
                           _buildSecurityNote(),
+                        ] else ...[
+                          const SizedBox(height: 16),
+                          _buildGoogleSection(signingUp: true),
                         ],
                       ],
                     ),
@@ -435,28 +469,28 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildSecurityNote() {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AtelierProColors.surfaceContainerLow,
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Icon(Icons.circle,
-                size: 8, color: AtelierProColors.statusDelivered),
+            padding: const EdgeInsets.only(top: 4),
+            child: Icon(Icons.circle, size: 8, color: colors.tertiary),
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               "Connexion protégée. Après plusieurs essais échoués, l'accès est suspendu quelques minutes pour protéger votre compte.",
               style: TextStyle(
                 fontSize: 12,
                 height: 1.45,
-                color: AtelierProColors.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ),
@@ -466,6 +500,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildEmailForm() {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -512,7 +547,7 @@ class _AuthScreenState extends State<AuthScreen> {
             if (_isSignUp) {
               final error =
                   PasswordPolicy.validate(value, email: _emailCtrl.text.trim());
-              return error ?? null;
+              return error;
             }
             return null;
           },
@@ -528,7 +563,7 @@ class _AuthScreenState extends State<AuthScreen> {
             child: TextButton(
               onPressed: _forgotPassword,
               style: TextButton.styleFrom(
-                foregroundColor: AtelierProColors.secondary,
+                foregroundColor: colors.primary,
                 minimumSize: const Size(44, 44),
               ),
               child: const Text('Mot de passe oublié ?'),
@@ -558,44 +593,17 @@ class _AuthScreenState extends State<AuthScreen> {
           const SizedBox(height: 8),
           _buildPolicyConsent(),
           if (!_acceptedPolicies)
-            const Padding(
-              padding: EdgeInsets.only(left: 12, top: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 12, top: 2),
               child: Text(
                 'Cochez la case pour créer votre compte.',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AtelierProColors.onSurfaceMuted,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AtelierProColors.secondaryFixed,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Étape suivante : ',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  TextSpan(
-                    text: 'après confirmation de votre e-mail, vous choisirez '
-                        'le métier de votre atelier. Ce choix est définitif '
-                        'pour ce compte.',
-                  ),
-                ],
-              ),
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: AtelierProColors.onSecondaryContainer,
-              ),
-            ),
-          ),
         ],
         const SizedBox(height: 16),
         ElevatedButton(
@@ -603,20 +611,23 @@ class _AuthScreenState extends State<AuthScreen> {
               ? null
               : _submitEmail,
           child: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   height: 18,
                   width: 18,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
+                    strokeWidth: 2,
+                    color: colors.onPrimary,
+                  ),
+                )
               : Text(_isSignUp ? 'Créer mon compte' : 'Se connecter'),
         ),
         if (_isSignUp) ...[
           const SizedBox(height: 44),
-          const Text(
+          Text(
             'Un e-mail de confirmation vous sera envoyé.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: AtelierProColors.onSurfaceVariant,
+              color: colors.onSurfaceVariant,
               fontSize: 12,
             ),
           ),
@@ -629,15 +640,16 @@ class _AuthScreenState extends State<AuthScreen> {
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AtelierProColors.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
       );
 
   Widget _buildPhoneForm() {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -652,8 +664,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ? 'Entre le code à 6 chiffres envoyé au ${normalizePhone(_phoneCtrl.text.trim())}'
               : 'Compte créé automatiquement à la première connexion',
           textAlign: TextAlign.center,
-          style: const TextStyle(
-              color: AtelierProColors.onSurfaceVariant, fontSize: 13),
+          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
         ),
         const SizedBox(height: 20),
         if (!_codeSent) ...[
@@ -671,11 +682,14 @@ class _AuthScreenState extends State<AuthScreen> {
           ElevatedButton(
             onPressed: _loading ? null : _sendPhoneCode,
             child: _loading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 18,
                     width: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
+                      strokeWidth: 2,
+                      color: colors.onPrimary,
+                    ),
+                  )
                 : const Text('Recevoir le code par SMS'),
           ),
         ] else ...[
@@ -692,11 +706,14 @@ class _AuthScreenState extends State<AuthScreen> {
           ElevatedButton(
             onPressed: _loading ? null : _confirmPhoneCode,
             child: _loading
-                ? const SizedBox(
+                ? SizedBox(
                     height: 18,
                     width: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
+                      strokeWidth: 2,
+                      color: colors.onPrimary,
+                    ),
+                  )
                 : const Text('Vérifier le code'),
           ),
           const SizedBox(height: 8),
@@ -729,6 +746,7 @@ class _MethodChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Semantics(
       button: true,
       selected: selected,
@@ -740,19 +758,19 @@ class _MethodChoice extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? AtelierProColors.primary : Colors.transparent,
+            color: selected ? colors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: selected
-                  ? AtelierProColors.primary
-                  : AtelierProColors.outlineVariant,
+                  ? colors.primary
+                  : colors.outlineVariant,
             ),
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : AtelierProColors.onSurface,
+                color: selected ? colors.onPrimary : colors.onSurface,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
@@ -775,14 +793,15 @@ class _LegalLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Text(
           label,
-          style: const TextStyle(
-            color: AtelierProColors.secondary,
+          style: TextStyle(
+            color: colors.primary,
             decoration: TextDecoration.underline,
             fontWeight: FontWeight.w600,
           ),

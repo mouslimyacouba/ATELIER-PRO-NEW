@@ -10,6 +10,7 @@ import 'core/theme.dart';
 import 'core/router.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
+import 'core/sync_status.dart';
 import 'providers/atelier_provider.dart';
 import 'providers/clients_provider.dart';
 import 'providers/orders_provider.dart';
@@ -61,6 +62,7 @@ class AtelierProApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<SyncStatus>.value(value: SyncStatus.instance),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),

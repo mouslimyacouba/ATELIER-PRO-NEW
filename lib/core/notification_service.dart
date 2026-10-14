@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/order.dart';
+import 'reminder_signature.dart';
 
 /// Rappels locaux de livraison. Aucun serveur impliqué : chaque appareil
 /// planifie ses propres notifications via le système d'exploitation, donc
@@ -17,6 +19,8 @@ class NotificationService {
   NotificationService._();
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static String? _lastSignature;
+  static Future<void> _chain = Future<void>.value();
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -113,14 +117,37 @@ class NotificationService {
   ///
   /// Notifie aussi immédiatement pour les commandes déjà en retard,
   /// en groupant le résumé si plusieurs sont en retard.
-  static Future<void> syncReminders(List<AtelierOrder> orders) async {
-    if (!_initialized) return;
+  static Future<void> syncReminders(
+    List<AtelierOrder> orders, {
+    bool force = false,
+  }) {
+    if (!_initialized) return Future<void>.value();
+    final signature = reminderSignature(orders, DateTime.now());
+    if (!force && signature == _lastSignature) return _chain;
+    _lastSignature = signature;
+    _chain = _chain.then((_) => _doSync(orders)).catchError((Object error) {
+      _lastSignature = null;
+      debugPrint('Synchronisation des rappels : $error');
+    });
+    return _chain;
+  }
+
+  static Future<void> _doSync(List<AtelierOrder> orders) async {
+    final stopwatch = kDebugMode ? (Stopwatch()..start()) : null;
 
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('notifications_enabled') ?? true;
 
     await _plugin.cancelAll();
-    if (!enabled) return;
+    if (!enabled) {
+      if (kDebugMode) {
+        debugPrint(
+          '[PERF] syncReminders completed in '
+          '${stopwatch!.elapsedMilliseconds}ms orders=${orders.length}',
+        );
+      }
+      return;
+    }
 
     final today = DateTime.now();
     final todayOnly = DateTime(today.year, today.month, today.day);
@@ -184,6 +211,12 @@ class NotificationService {
         'Livraison aujourd\'hui — ${o.numeroFormate}',
         '$client attend "${o.description}" aujourd\'hui.',
         jourJ,
+      );
+    }
+    if (kDebugMode) {
+      debugPrint(
+        '[PERF] syncReminders completed in '
+        '${stopwatch!.elapsedMilliseconds}ms orders=${orders.length}',
       );
     }
   }

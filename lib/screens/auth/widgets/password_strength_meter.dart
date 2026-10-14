@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/password_policy.dart';
-import '../../../core/theme.dart';
 
 class PasswordStrengthMeter extends StatelessWidget {
   const PasswordStrengthMeter({
@@ -17,6 +16,7 @@ class PasswordStrengthMeter extends StatelessWidget {
   Widget build(BuildContext context) {
     if (password.isEmpty) return const SizedBox.shrink();
 
+    final colors = Theme.of(context).colorScheme;
     final strength = PasswordPolicy.strength(password, email: email);
     final suggestion = PasswordPolicy.suggestion(password, email: email);
     final bars = switch (strength) {
@@ -49,11 +49,11 @@ class PasswordStrengthMeter extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: active
                             ? switch (strength) {
-                                PasswordStrength.strong => Colors.green,
-                                PasswordStrength.medium => AtelierProColors.secondary,
-                                _ => AtelierProColors.rougeAlerte,
+                                PasswordStrength.strong => colors.tertiary,
+                                PasswordStrength.medium => colors.secondary,
+                                _ => colors.error,
                               }
-                            : AtelierProColors.surfaceContainerHighest,
+                            : colors.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -62,14 +62,12 @@ class PasswordStrengthMeter extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                suggestion == null
-                    ? 'Mot de passe conforme.'
-                    : suggestion,
+                suggestion ?? 'Mot de passe conforme.',
                 style: TextStyle(
                   fontSize: 12,
                   color: suggestion == null
-                      ? AtelierProColors.tertiaryContainer
-                      : AtelierProColors.onSurfaceVariant,
+                      ? colors.tertiary
+                      : colors.onSurfaceVariant,
                 ),
               ),
             ],

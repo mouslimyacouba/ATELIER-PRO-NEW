@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import '../core/offline_save.dart';
+import '../core/sync_status.dart';
 import '../models/modele_fabrication.dart';
 
 /// Provider des modèles de fabrication.
@@ -128,7 +130,10 @@ class ModelesProvider with ChangeNotifier {
 
     // Pas de _modeles.insert() manuel : le stream reçoit le nouveau document
     // automatiquement et notifie les widgets.
-    await docRef.set(nouveauModele.toJson());
+    await writeWithOfflineGrace(
+      () => docRef.set(nouveauModele.toJson()),
+      onLocalWrite: SyncStatus.instance.onLocalWrite,
+    );
   }
 
   /// Met à jour un modèle existant avec les données du [modele] reçu.
@@ -142,7 +147,10 @@ class ModelesProvider with ChangeNotifier {
     // Remplace updatedAt par le timestamp serveur pour la cohérence.
     data['updatedAt'] = FieldValue.serverTimestamp();
 
-    await _firestore.collection('modeles').doc(modele.id).update(data);
+    await writeWithOfflineGrace(
+      () => _firestore.collection('modeles').doc(modele.id).update(data),
+      onLocalWrite: SyncStatus.instance.onLocalWrite,
+    );
     // Pas de mise à jour manuelle : le stream rafraîchit la liste.
   }
 
@@ -152,9 +160,12 @@ class ModelesProvider with ChangeNotifier {
 
     // Soft delete — actif = false. Le stream renverra le document mis à jour,
     // le getter `modeles` le filtrera automatiquement.
-    await _firestore.collection('modeles').doc(id).update({
-      'actif': false,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    await writeWithOfflineGrace(
+      () => _firestore.collection('modeles').doc(id).update({
+        'actif': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+      onLocalWrite: SyncStatus.instance.onLocalWrite,
+    );
   }
 }

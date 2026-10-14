@@ -1,8 +1,16 @@
 import 'dart:async';
 import '../core/firestore_errors.dart';
+import '../core/offline_save.dart';
+import '../core/sync_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/fiche_mesure.dart';
+
+List<FicheMesure> filterFichesForClient(
+  Iterable<FicheMesure> fiches,
+  String clientId,
+) =>
+    fiches.where((fiche) => fiche.clientId == clientId).toList();
 
 class FichesMesuresProvider extends ChangeNotifier {
   final _firestore = FirebaseFirestore.instance;
@@ -18,7 +26,7 @@ class FichesMesuresProvider extends ChangeNotifier {
   String? get error => _error;
 
   List<FicheMesure> forClient(String clientId) =>
-      _fiches.where((f) => f.clientId == clientId).toList();
+      filterFichesForClient(_fiches, clientId);
 
   @override
   void dispose() {
@@ -29,8 +37,8 @@ class FichesMesuresProvider extends ChangeNotifier {
   /// S'abonne en temps réel aux fiches de cet utilisateur — voir
   /// ClientsProvider.load pour le détail du comportement hors ligne
   /// (identique ici).
-  Future<void> load(String userId) {
-    if (_currentUserId == userId && _sub != null) {
+  Future<void> load(String userId, {bool forceRefresh = false}) {
+    if (!forceRefresh && _currentUserId == userId && _sub != null) {
       return Future.value();
     }
     _currentUserId = userId;
@@ -66,7 +74,10 @@ class FichesMesuresProvider extends ChangeNotifier {
 
   Future<String?> addFiche(FicheMesure fiche) async {
     try {
-      await _firestore.collection('fiches').add(fiche.toInsertMap());
+      await writeWithOfflineGrace(
+        () => _firestore.collection('fiches').add(fiche.toInsertMap()),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -77,7 +88,10 @@ class FichesMesuresProvider extends ChangeNotifier {
     final mapped = Map<String, dynamic>.from(changes);
     mapped['updatedAt'] = FieldValue.serverTimestamp();
     try {
-      await _firestore.collection('fiches').doc(id).update(mapped);
+      await writeWithOfflineGrace(
+        () => _firestore.collection('fiches').doc(id).update(mapped),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -86,7 +100,10 @@ class FichesMesuresProvider extends ChangeNotifier {
 
   Future<String?> deleteFiche(String id) async {
     try {
-      await _firestore.collection('fiches').doc(id).delete();
+      await writeWithOfflineGrace(
+        () => _firestore.collection('fiches').doc(id).delete(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
