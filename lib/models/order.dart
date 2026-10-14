@@ -80,6 +80,7 @@ class AtelierOrder {
   final double coutMateriaux;
   final double coutMainDoeuvre;
   final double coutTransport;
+  final bool hasValidFinancialData;
 
   AtelierOrder({
     required this.id,
@@ -102,6 +103,7 @@ class AtelierOrder {
     this.coutMateriaux = 0.0,
     this.coutMainDoeuvre = 0.0,
     this.coutTransport = 0.0,
+    this.hasValidFinancialData = true,
   });
 
   double get coutTotalRevient => coutMateriaux + coutMainDoeuvre + coutTransport;
@@ -130,6 +132,14 @@ class AtelierOrder {
   }
 
   factory AtelierOrder.fromMap(String id, Map<String, dynamic> map) {
+    final rawTotal = map['prixTotal'];
+    final rawPaid = map['acompte'];
+    final totalAmount = rawTotal is num ? rawTotal.toDouble() : 0.0;
+    final paidAmount = rawPaid is num ? rawPaid.toDouble() : 0.0;
+    final validTotal =
+        rawTotal is num && rawTotal.isFinite && rawTotal >= 0;
+    final validPaid = rawPaid is num && rawPaid.isFinite && rawPaid >= 0;
+
     return AtelierOrder(
       id: id,
       userId: map['userId'] as String,
@@ -140,8 +150,8 @@ class AtelierOrder {
       dateCommande:
           (map['dateCommande'] as Timestamp?)?.toDate() ?? DateTime.now(),
       dateEcheance: (map['dateEcheance'] as Timestamp?)?.toDate(),
-      prixTotal: (map['prixTotal'] as num).toDouble(),
-      acompte: (map['acompte'] as num?)?.toDouble() ?? 0,
+      prixTotal: totalAmount,
+      acompte: paidAmount,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       clientName: map['clientNom'] as String?,
       modeleId: map['modeleId'] as String?,
@@ -159,6 +169,7 @@ class AtelierOrder {
       coutMateriaux: (map['coutMateriaux'] as num?)?.toDouble() ?? 0.0,
       coutMainDoeuvre: (map['coutMainDoeuvre'] as num?)?.toDouble() ?? 0.0,
       coutTransport: (map['coutTransport'] as num?)?.toDouble() ?? 0.0,
+      hasValidFinancialData: validTotal && validPaid,
     );
   }
 

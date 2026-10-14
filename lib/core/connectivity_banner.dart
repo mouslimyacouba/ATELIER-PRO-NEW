@@ -1,5 +1,7 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'sync_status.dart';
 import 'theme.dart';
 
 /// Petit bandeau affiché en haut de l'écran quand l'appareil est hors ligne.
@@ -11,6 +13,9 @@ class ConnectivityBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasPendingWrites = context.watch<SyncStatus>().hasPending;
+    final colors = Theme.of(context).colorScheme;
+
     return StreamBuilder<List<ConnectivityResult>>(
       stream: Connectivity().onConnectivityChanged,
       builder: (context, snapshot) {
@@ -19,40 +24,68 @@ class ConnectivityBanner extends StatelessWidget {
             results.isNotEmpty &&
             results.every((r) => r == ConnectivityResult.none);
 
-        if (!offline) return const SizedBox.shrink();
+        if (!offline && !hasPendingWrites) return const SizedBox.shrink();
 
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AtelierProColors.primaryContainer,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.12),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+        return Column(
+          children: [
+            if (offline)
+              _ConnectivityMessage(
+                icon: Icons.wifi_off_rounded,
+                color: AtelierProColors.primaryContainer,
+                foreground: colors.onPrimary,
+                message: 'Mode hors-ligne — Vos modifications sont enregistrées '
+                    'localement et seront synchronisées.',
               ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.wifi_off_rounded, size: 18, color: Color(0xFFF59E0B)),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Mode hors-ligne — Vos modifications sont enregistrées localement et seront synchronisées.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
+            if (hasPendingWrites)
+              _ConnectivityMessage(
+                icon: Icons.cloud_upload_outlined,
+                color: colors.secondaryContainer,
+                foreground: colors.onSecondaryContainer,
+                message: 'Envoi en attente — vos données sont enregistrées sur '
+                    'le téléphone.',
               ),
-            ],
-          ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _ConnectivityMessage extends StatelessWidget {
+  const _ConnectivityMessage({
+    required this.icon,
+    required this.color,
+    required this.foreground,
+    required this.message,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color foreground;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: color,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: foreground),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

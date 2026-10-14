@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme.dart';
-
 class AuthSegmentedControl extends StatelessWidget {
   const AuthSegmentedControl({
     super.key,
@@ -16,10 +14,11 @@ class AuthSegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AtelierProColors.surfaceContainer,
+        color: colors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -57,6 +56,7 @@ class _AuthTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Semantics(
       selected: selected,
       button: true,
@@ -70,7 +70,7 @@ class _AuthTab extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 44),
           decoration: BoxDecoration(
             color: selected
-                  ? AtelierProColors.surfaceContainerLowest
+                  ? colors.surface
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -79,8 +79,8 @@ class _AuthTab extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               color: selected
-                  ? AtelierProColors.primary
-                  : AtelierProColors.onSurfaceVariant,
+                  ? colors.primary
+                  : colors.onSurfaceVariant,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             ),
           ),

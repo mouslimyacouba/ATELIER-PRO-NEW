@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/stock_item.dart';
 import '../core/firestore_errors.dart';
+import '../core/offline_save.dart';
+import '../core/sync_status.dart';
 
 class StockProvider extends ChangeNotifier {
   final _firestore = FirebaseFirestore.instance;
@@ -77,12 +79,18 @@ class StockProvider extends ChangeNotifier {
 
     try {
       if (item.id.isEmpty) {
-        await _firestore.collection('stock').add(item.toInsertMap());
+        await writeWithOfflineGrace(
+          () => _firestore.collection('stock').add(item.toInsertMap()),
+          onLocalWrite: SyncStatus.instance.onLocalWrite,
+        );
       } else {
-        await _firestore
-            .collection('stock')
-            .doc(item.id)
-            .update(item.toInsertMap());
+        await writeWithOfflineGrace(
+          () => _firestore
+              .collection('stock')
+              .doc(item.id)
+              .update(item.toInsertMap()),
+          onLocalWrite: SyncStatus.instance.onLocalWrite,
+        );
       }
       return null;
     } catch (e) {
@@ -98,7 +106,10 @@ class StockProvider extends ChangeNotifier {
     }
 
     try {
-      await _firestore.collection('stock').doc(id).delete();
+      await writeWithOfflineGrace(
+        () => _firestore.collection('stock').doc(id).delete(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);
@@ -137,7 +148,10 @@ class StockProvider extends ChangeNotifier {
           });
         }
       }
-      await batch.commit();
+      await writeWithOfflineGrace(
+        () => batch.commit(),
+        onLocalWrite: SyncStatus.instance.onLocalWrite,
+      );
       return null;
     } catch (e) {
       return friendlyFirestoreError(e);

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
-import '../../models/client.dart';
 import '../../providers/atelier_provider.dart';
 import '../../providers/clients_provider.dart';
 import '../../widgets/empty_state.dart';
@@ -36,112 +35,8 @@ class _ClientsScreenState extends State<ClientsScreen> {
     super.dispose();
   }
 
-  Future<void> _openForm({AtelierClient? existing}) async {
-    final atelier = context.read<AtelierProvider>().atelier;
-    if (atelier == null) return;
-    final userId = atelier.userId;
-    final nameCtrl = TextEditingController(text: existing?.nomComplet ?? '');
-    final phoneCtrl = TextEditingController(text: existing?.telephone ?? '');
-    final addressCtrl = TextEditingController(text: existing?.adresse ?? '');
-    final notesCtrl = TextEditingController(text: existing?.notes ?? '');
-    final formKey = GlobalKey<FormState>();
-
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                existing == null ? 'Nouveau client' : 'Modifier le client',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Nom'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Téléphone',
-                  hintText: '90 00 00 00',
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return null;
-                  final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-                  if (digits.length != 8) return 'Le numéro doit avoir 8 chiffres';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: addressCtrl,
-                decoration: const InputDecoration(labelText: 'Adresse'),
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: notesCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Notes'),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  if (!formKey.currentState!.validate()) return;
-                  final clientsProvider = context.read<ClientsProvider>();
-                  String? error;
-                  if (existing == null) {
-                    error = await clientsProvider.addClient(AtelierClient(
-                      id: '',
-                      userId: userId,
-                      nomComplet: nameCtrl.text.trim(),
-                      telephone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                      adresse: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                      notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                      createdAt: DateTime.now(),
-                      updatedAt: DateTime.now(),
-                    ));
-                  } else {
-                    error = await clientsProvider.updateClient(existing.id, {
-                      'nom_complet': nameCtrl.text.trim(),
-                      'telephone': phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                      'adresse': addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                      'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                    });
-                  }
-                  if (ctx.mounted) {
-                    if (error != null) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(error)));
-                    } else {
-                      Navigator.of(ctx).pop(true);
-                    }
-                  }
-                },
-                child: const Text('Enregistrer'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (saved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Client enregistré')));
-    }
+  Future<void> _openNewClient() async {
+    await context.push<bool>('/clients/nouveau');
   }
 
   @override
@@ -172,7 +67,11 @@ class _ClientsScreenState extends State<ClientsScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 final userId = context.read<AtelierProvider>().atelier?.userId;
-                if (userId != null) await context.read<ClientsProvider>().load(userId);
+                if (userId != null) {
+                  await context
+                      .read<ClientsProvider>()
+                      .load(userId, forceRefresh: true);
+                }
               },
               child: clientsProvider.loading && clientsProvider.clients.isEmpty
                   ? const AtelierSpinner()
@@ -181,7 +80,11 @@ class _ClientsScreenState extends State<ClientsScreen> {
                           message: clientsProvider.error!,
                           onRetry: () {
                             final userId = context.read<AtelierProvider>().atelier?.userId;
-                            if (userId != null) context.read<ClientsProvider>().load(userId);
+                            if (userId != null) {
+                              context
+                                  .read<ClientsProvider>()
+                                  .load(userId, forceRefresh: true);
+                            }
                           },
                         )
                       : filtered.isEmpty
@@ -196,7 +99,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                   title: 'Aucun client',
                                   subtitle: 'Ajoutez votre premier client pour commencer.',
                                   actionLabel: 'Ajouter un client',
-                                  onAction: () => _openForm(),
+                                  onAction: _openNewClient,
                                 )
                           : ListView.separated(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -229,7 +132,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(),
+        onPressed: _openNewClient,
         child: const Icon(Icons.add),
       ),
     );

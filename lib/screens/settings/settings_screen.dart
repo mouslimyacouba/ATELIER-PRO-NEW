@@ -5,12 +5,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../core/contact_actions.dart';
 import '../../core/storage_service.dart';
-import '../../core/theme.dart';
+import '../../models/atelier.dart';
 import '../../providers/atelier_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/theme_provider.dart';
 import 'delete_account_dialogs.dart';
-import 'widgets/locked_metier_tile.dart';
+import 'widgets/metier_info_tile.dart';
+import 'widgets/settings_group.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -110,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
                 ),
                 const SizedBox(height: 10),
-                LockedMetierTile(metier: atelier.specialiteLabel),
+                MetierInfoTile(metier: atelier.specialiteLabel),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: telephoneCtrl,
@@ -183,8 +183,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Text('Annuler')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Se déconnecter',
-                style: TextStyle(color: AtelierProColors.rougeAlerte)),
+            child: Text(
+              'Se déconnecter',
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -197,6 +199,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _contactSupport() async {
     await openWhatsApp(_supportPhone,
         message: 'Bonjour, j\'ai besoin d\'aide avec AtelierPro Mobile.');
+  }
+
+  Future<void> _changePassword() async {
+    final auth = context.read<AuthProvider>();
+    final email = auth.user?.email;
+    if (email == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Changer le mot de passe'),
+        content: Text(
+          'Nous allons envoyer un lien de réinitialisation à $email. '
+          'Ouvrez-le pour choisir un nouveau mot de passe.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Envoyer le lien'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final error = await auth.resetPasswordForEmail(email);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          error ??
+              'Lien envoyé à $email. Pensez à vérifier vos courriers '
+                  'indésirables.',
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmDeleteAccount() async {
@@ -263,211 +306,315 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final atelier = context.watch<AtelierProvider>().atelier;
-    final user = context.watch<AuthProvider>().user;
-    final themeProvider = context.watch<ThemeProvider>();
+  void _showAccountInfo() {
+    final auth = context.read<AuthProvider>();
+    final user = auth.user;
+    final providers = auth.signInProviders;
+    final method = providers.contains('google.com')
+        ? 'Google'
+        : providers.contains('phone')
+            ? 'Téléphone (code SMS)'
+            : 'E-mail et mot de passe';
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Paramètres')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: SwitchListTile(
-              secondary: const Icon(Icons.dark_mode_outlined),
-              title: const Text('Mode sombre'),
-              value: themeProvider.isDarkMode,
-              onChanged: (value) => themeProvider.toggleTheme(value),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: GestureDetector(
-                onTap: _uploadingLogo ? null : _changeLogo,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor:
-                          AtelierProColors.terracotta.withValues(alpha: 0.12),
-                      backgroundImage: (atelier?.logoUrl != null)
-                          ? NetworkImage(atelier!.logoUrl!)
-                          : null,
-                      child: _uploadingLogo
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : (atelier?.logoUrl == null
-                              ? const Icon(
-                                  Icons.storefront,
-                                  color: AtelierProColors.terracotta,
-                                  size: 26,
-                                )
-                              : null),
-                    ),
-                    Positioned(
-                      bottom: -2,
-                      right: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          color: AtelierProColors.terracotta,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            size: 10, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              title: Text(atelier?.nomAtelier ?? '—'),
-              subtitle: Text(atelier?.specialiteLabel ?? ''),
-              trailing: const Icon(Icons.edit_outlined, size: 20),
-              onTap: _editAtelier,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.dashboard_customize_outlined,
-                  color: AtelierProColors.primary),
-              title: const Text('Mes modèles de fabrication'),
-              subtitle: const Text('Boubou homme, table en bois...'),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () => context.push('/modeles'),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.inventory_2_outlined,
-                  color: AtelierProColors.primary),
-              title: const Text('Mon stock de matériel'),
-              subtitle: const Text('Suivi des tissus, fils et fournitures...'),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () => context.push('/stock'),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.phone_outlined),
-                  title: Text(atelier?.telephone ?? 'Téléphone non renseigné'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.location_on_outlined),
-                  title: Text(atelier?.ville ?? 'Ville non renseignée'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.email_outlined),
-                  title: Text(user?.email ?? '—'),
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Mon compte', style: Theme.of(ctx).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              _AccountLine(label: 'Connexion', value: method),
+              if (user?.email != null) ...[
+                _AccountLine(label: 'Adresse e-mail', value: user!.email!),
+                _AccountLine(
+                  label: 'E-mail vérifié',
+                  value: user.emailVerified ? 'Oui' : 'Non',
                 ),
               ],
-            ),
+              if (user?.phoneNumber != null)
+                _AccountLine(label: 'Téléphone', value: user!.phoneNumber!),
+            ],
           ),
-          const SizedBox(height: 24),
-          Card(
-            color: AtelierProColors.terracotta.withValues(alpha: 0.06),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAtelierCard(Atelier? atelier) {
+    final colors = Theme.of(context).colorScheme;
+    final details = [
+      atelier?.specialiteLabel,
+      atelier?.ville,
+    ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' · ');
+
+    return SettingsGroup(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _editAtelier,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.payments_outlined,
-                      color: AtelierProColors.terracotta),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      "Paiement mobile money (iPayMoney) : à venir. Les paiements se saisissent "
-                      "manuellement pour l'instant depuis chaque commande.",
-                      style: TextStyle(fontSize: 13),
+                  GestureDetector(
+                    onTap: _uploadingLogo ? null : _changeLogo,
+                    child: Semantics(
+                      button: true,
+                      label: "Changer le logo de l'atelier",
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: colors.surfaceContainerHighest,
+                            backgroundImage: atelier?.logoUrl == null
+                                ? null
+                                : NetworkImage(atelier!.logoUrl!),
+                            child: _uploadingLogo
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : atelier?.logoUrl == null
+                                    ? Icon(
+                                        Icons.storefront_outlined,
+                                        color: colors.primary,
+                                      )
+                                    : null,
+                          ),
+                          Positioned(
+                            bottom: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: colors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.camera_alt,
+                                size: 11,
+                                color: colors.onPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          atelier?.nomAtelier ?? 'Mon atelier',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (details.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            details,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: colors.outline),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          Card(
-            child: Column(
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final atelier = context.watch<AtelierProvider>().atelier;
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+    final hasPassword = auth.signInProviders.contains('password');
+    final colors = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          children: [
+            Semantics(
+              header: true,
+              child: Text(
+                'Réglages',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Votre atelier, votre compte et l'application",
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 20),
+            _buildAtelierCard(atelier),
+            const SettingsSectionLabel('Mon atelier'),
+            SettingsGroup(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.help_outline),
-                  title: const Text('Aide / Support (WhatsApp)'),
-                  subtitle: const Text('Numéro : 82199929'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _contactSupport,
+                SettingsRow(
+                  icon: Icons.storefront_outlined,
+                  title: "Informations de l'atelier",
+                  subtitle: 'Nom, téléphone, ville, logo',
+                  onTap: _editAtelier,
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('Confidentialité des données'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/parametres/confidentialite'),
+                SettingsRow(
+                  icon: Icons.dashboard_customize_outlined,
+                  title: 'Modèles de fabrication',
+                  subtitle: 'Boubou homme, table en bois…',
+                  onTap: () => context.push('/modeles'),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.gavel_outlined),
-                  title: const Text('Conditions d\'utilisation (CGU)'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/parametres/cgu'),
+                SettingsRow(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Stock de matériel',
+                  subtitle: 'Tissus, fils et fournitures',
+                  onTap: () => context.push('/stock'),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: _confirmSignOut,
-            icon: const Icon(Icons.logout, color: AtelierProColors.rougeAlerte),
-            label: const Text('Se déconnecter',
-                style: TextStyle(color: AtelierProColors.rougeAlerte)),
-            style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AtelierProColors.rougeAlerte)),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _deletingAccount ? null : _confirmDeleteAccount,
-            child: _deletingAccount
-                ? const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 10),
-                      Text('Suppression en cours…'),
-                    ],
-                  )
-                : const Text(
-                    'Supprimer mon compte et mes données',
-                    style: TextStyle(
-                      color: AtelierProColors.onSurfaceMuted,
-                      fontSize: 12,
-                    ),
+            const SettingsSectionLabel('Compte'),
+            SettingsGroup(
+              children: [
+                SettingsRow(
+                  icon: Icons.person_outline,
+                  title: 'Mon compte',
+                  subtitle: user?.email ?? user?.phoneNumber,
+                  onTap: _showAccountInfo,
+                ),
+                if (hasPassword)
+                  SettingsRow(
+                    icon: Icons.lock_outline,
+                    title: 'Changer le mot de passe',
+                    subtitle: 'Un lien vous est envoyé par e-mail',
+                    onTap: _changePassword,
                   ),
-          ),
-          if (_appVersion.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Center(
-              child: Text(
-                'AtelierPro · v$_appVersion',
-                style: const TextStyle(
-                    fontSize: 12, color: AtelierProColors.onSurfaceMuted),
-              ),
+              ],
             ),
+            const SettingsSectionLabel('Préférences'),
+            SettingsGroup(
+              children: [
+                SettingsRow(
+                  icon: Icons.settings_outlined,
+                  title: 'Paramètres',
+                  subtitle: 'Thème et notifications',
+                  onTap: () => context.push('/parametres/preferences'),
+                ),
+                SettingsRow(
+                  icon: Icons.shield_outlined,
+                  title: 'Confidentialité des données',
+                  onTap: () => context.push('/parametres/confidentialite'),
+                ),
+                SettingsRow(
+                  icon: Icons.description_outlined,
+                  title: "Conditions d'utilisation",
+                  onTap: () => context.push('/parametres/cgu'),
+                ),
+                SettingsRow(
+                  icon: Icons.help_outline,
+                  title: 'Aide / Support (WhatsApp)',
+                  onTap: _contactSupport,
+                ),
+                SettingsRow(
+                  icon: Icons.info_outline,
+                  title: "À propos d'AtelierPro",
+                  subtitle: _appVersion.isEmpty ? null : 'Version $_appVersion',
+                  onTap: () => showAboutDialog(
+                    context: context,
+                    applicationName: 'AtelierPro',
+                    applicationVersion: _appVersion,
+                  ),
+                ),
+              ],
+            ),
+            const SettingsSectionLabel('Zone de danger'),
+            SettingsGroup(
+              children: [
+                SettingsRow(
+                  icon: Icons.logout,
+                  title: 'Se déconnecter',
+                  onTap: _confirmSignOut,
+                ),
+                SettingsRow(
+                  icon: Icons.delete_outline,
+                  title: 'Supprimer mon compte',
+                  subtitle: 'Supprime votre compte et toutes vos données',
+                  danger: true,
+                  onTap: _deletingAccount ? null : _confirmDeleteAccount,
+                  trailing: _deletingAccount
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+            if (_appVersion.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Center(
+                child: Text(
+                  'AtelierPro · v$_appVersion',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountLine extends StatelessWidget {
+  const _AccountLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );

@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme.dart';
+
 import '../../providers/auth_provider.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
@@ -48,20 +50,19 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
 
   Future<void> _checkVerified({bool silent = false}) async {
     if (_checking) return;
-    if (!silent) {
-      setState(() => _checking = true);
-    }
+    setState(() => _checking = true);
     final verified = await context.read<AuthProvider>().checkEmailVerified();
     if (!mounted) return;
-    if (!silent) {
-      setState(() {
-        _checking = false;
-        _message = verified
-            ? null
-            : 'Toujours pas vérifié — vérifie ta boîte de réception (et les spams).';
-      });
-    } else if (verified) {
-      setState(() => _message = null);
+    setState(() {
+      _checking = false;
+      _message = verified
+          ? null
+          : silent
+              ? _message
+              : 'Toujours pas vérifié — vérifie ta boîte de réception (et les spams).';
+    });
+    if (verified) {
+      context.go('/');
     }
   }
 
@@ -105,7 +106,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
     final email = context.watch<AuthProvider>().user?.email ?? '';
 
     return Scaffold(
-      backgroundColor: AtelierProColors.sable,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -133,7 +133,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
                   'On a envoyé un lien de confirmation à $email. '
                   'Clique dessus, puis reviens ici — la page se mettra à jour automatiquement.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AtelierProColors.onSurfaceVariant),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 // Indicateur de vérification automatique en cours
@@ -145,7 +147,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
                       height: 12,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AtelierProColors.terracotta,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -153,7 +155,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
                       'Vérification automatique en cours…',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AtelierProColors.onSurfaceVariant,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -168,11 +170,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
                 ElevatedButton(
                   onPressed: _checking ? null : () => _checkVerified(silent: false),
                   child: _checking
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 18,
                           width: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         )
                       : const Text("J'ai vérifié — actualiser"),
                 ),
@@ -189,8 +193,12 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
                 const SizedBox(height: 24),
                 TextButton(
                   onPressed: () => context.read<AuthProvider>().signOut(),
-                  child: const Text('Se déconnecter',
-                      style: TextStyle(color: AtelierProColors.onSurfaceMuted)),
+                  child: Text(
+                    'Se déconnecter',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ],
             ),

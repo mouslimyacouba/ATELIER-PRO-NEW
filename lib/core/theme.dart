@@ -172,7 +172,9 @@ class AtelierProTheme {
   static ThemeData _applyCommonTheme(ThemeData base, Brightness brightness) {
     final isLight = brightness == Brightness.light;
     final surfaceColor = isLight ? AtelierProColors.surfaceContainerLowest : AtelierProColors.surfaceContainerDark;
+    final disabledSurfaceColor = isLight ? AtelierProColors.surfaceContainer : AtelierProColors.surfaceContainerHighDark;
     final onSurfaceColor = isLight ? AtelierProColors.onSurface : AtelierProColors.onSurfaceDark;
+    final hintColor = isLight ? AtelierProColors.onSurfaceMuted : AtelierProColors.onSurfaceMutedDark;
     final outlineColor = isLight ? AtelierProColors.outlineVariant : AtelierProColors.outlineVariantDark;
 
     return base.copyWith(
@@ -201,7 +203,8 @@ class AtelierProTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: isLight ? AtelierProColors.primaryContainer : AtelierProColors.primaryFixed,
           foregroundColor: isLight ? Colors.white : AtelierProColors.primary,
-          disabledBackgroundColor: (isLight ? AtelierProColors.primaryContainer : AtelierProColors.primaryFixed).withValues(alpha: 0.4),
+          disabledBackgroundColor: disabledSurfaceColor,
+          disabledForegroundColor: hintColor,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -211,7 +214,7 @@ class AtelierProTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isLight ? AtelierProColors.primary : AtelierProColors.onSurfaceDark,
+          foregroundColor: onSurfaceColor,
           side: BorderSide(color: outlineColor, width: 1),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           minimumSize: const Size.fromHeight(48),
@@ -326,4 +329,3 @@ class StatusPill extends StatelessWidget {
     );
   }
 }
-
