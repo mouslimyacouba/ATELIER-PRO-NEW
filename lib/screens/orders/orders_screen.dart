@@ -121,8 +121,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 final userId = context.read<AtelierProvider>().atelier?.userId;
-                if (userId != null)
+                if (userId != null) {
                   await context.read<OrdersProvider>().load(userId);
+                }
               },
               child: ordersProvider.loading && ordersProvider.orders.isEmpty
                   ? const AtelierSpinner()

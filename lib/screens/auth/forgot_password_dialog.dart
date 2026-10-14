@@ -146,7 +146,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "Si un compte existe pour ${_emailCtrl.text.trim()}, un e-mail "
+              'Si un compte existe pour ${_emailCtrl.text.trim()}, un e-mail '
               "de réinitialisation vient d'être envoyé.\n\n"
               'Pensez à vérifier vos courriers indésirables.',
               style: TextStyle(
@@ -170,7 +170,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Entrez votre adresse e-mail : nous vous enverrons un lien pour "
+            'Entrez votre adresse e-mail : nous vous enverrons un lien pour '
             'choisir un nouveau mot de passe.',
             style: TextStyle(
               fontSize: 13,

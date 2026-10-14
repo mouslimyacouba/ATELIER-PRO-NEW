@@ -106,7 +106,7 @@ class _DynamicFieldWidgetState extends State<DynamicFieldWidget> {
   Widget _buildSelectField(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return DropdownButtonFormField<String>(
-      value: widget.controller.text.isEmpty ? null : widget.controller.text,
+      initialValue: widget.controller.text.isEmpty ? null : widget.controller.text,
       icon: Icon(Icons.keyboard_arrow_down_rounded, color: colors.primary),
       style: TextStyle(
         fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,

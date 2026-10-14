@@ -59,7 +59,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     _coutMateriauxCtrl.dispose();
     _coutMainDoeuvreCtrl.dispose();
     _coutTransportCtrl.dispose();
-    for (var c in _dynamicControllers.values) c.dispose();
+    for (var c in _dynamicControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -261,7 +263,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final modeles = modelesProvider.modeles;
     return Column(children: [
       DropdownButtonFormField<String>(
-        value: _clientId,
+        initialValue: _clientId,
         decoration: const InputDecoration(
           labelText: 'Client *',
           border: OutlineInputBorder(),
@@ -293,7 +295,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         )
       else
         DropdownButtonFormField<String>(
-          value: _modeleId,
+          initialValue: _modeleId,
           decoration: const InputDecoration(
             labelText: 'Modèle (optionnel)',
             border: OutlineInputBorder(),
@@ -305,10 +307,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 .map((m) => DropdownMenuItem(value: m.id, child: Text(m.nom)))
           ],
           onChanged: (v) {
-            if (v != null)
+            if (v != null) {
               _appliquerModele(modeles.firstWhere((m) => m.id == v));
-            else
+            } else {
               setState(() => _modeleId = null);
+            }
           },
         ),
     ]);
@@ -316,8 +319,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Widget _buildSpecsStep() {
     final metierConfig = context.watch<MetierProvider>().config;
-    if (metierConfig == null || metierConfig.champs.isEmpty)
+    if (metierConfig == null || metierConfig.champs.isEmpty) {
       return const Text('Aucune spécification requise.');
+    }
     return DynamicFieldsForm(
         fields: metierConfig.champs,
         controllers: _dynamicControllers,
@@ -346,7 +350,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       children: [
         if (fiches.isNotEmpty) ...[
           DropdownButtonFormField<String>(
-            value: _ficheMesureId,
+            initialValue: _ficheMesureId,
             decoration: const InputDecoration(
                 labelText: 'Fiche liée', border: OutlineInputBorder()),
             items: fiches
@@ -491,7 +495,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         ListTile(
           title: Text(_dateEcheance == null
               ? "Date d'échéance / livraison"
-              : "Livraison : ${_dateEcheance!.day}/${_dateEcheance!.month}/${_dateEcheance!.year}"),
+              : 'Livraison : ${_dateEcheance!.day}/${_dateEcheance!.month}/${_dateEcheance!.year}'),
           trailing: const Icon(Icons.calendar_today),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -524,11 +528,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             minimumSize: const Size(120, 48),
           ),
           onPressed: () {
-            if (_currentStep == NewOrderStep.fabricationAcompte)
+            if (_currentStep == NewOrderStep.fabricationAcompte) {
               _submit();
-            else
+            } else {
               setState(() =>
                   _currentStep = NewOrderStep.values[_currentStep.index + 1]);
+            }
           },
           child: Text(_currentStep == NewOrderStep.fabricationAcompte
               ? 'CRÉER'

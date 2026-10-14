@@ -62,9 +62,7 @@ class PasswordStrengthMeter extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                suggestion == null
-                    ? 'Mot de passe conforme.'
-                    : suggestion,
+                suggestion ?? 'Mot de passe conforme.',
                 style: TextStyle(
                   fontSize: 12,
                   color: suggestion == null

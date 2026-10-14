@@ -67,14 +67,16 @@ class _StockFormScreenState extends State<StockFormScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final provider = context.read<StockProvider>();
         try {
-          _itemExistant = provider.items.firstWhere((i) => i.id == widget.itemId);
+          _itemExistant =
+              provider.items.firstWhere((i) => i.id == widget.itemId);
           setState(() {
             _nomCtrl.text = _itemExistant!.nom;
             _categorieCtrl.text = _itemExistant!.categorie;
             _quantiteCtrl.text = _itemExistant!.quantite.toString();
             _uniteCtrl.text = _itemExistant!.unite;
             _seuilAlerteCtrl.text = _itemExistant!.seuilAlerte.toString();
-            _coutUnitaireCtrl.text = _itemExistant!.coutUnitaire.toStringAsFixed(0);
+            _coutUnitaireCtrl.text =
+                _itemExistant!.coutUnitaire.toStringAsFixed(0);
           });
         } catch (_) {}
       });
@@ -105,10 +107,16 @@ class _StockFormScreenState extends State<StockFormScreen> {
       userId: userId,
       nom: _nomCtrl.text.trim(),
       categorie: _categorieCtrl.text.trim(),
-      quantite: double.tryParse(_quantiteCtrl.text.replaceAll(',', '.').trim()) ?? 0.0,
+      quantite:
+          double.tryParse(_quantiteCtrl.text.replaceAll(',', '.').trim()) ??
+              0.0,
       unite: _uniteCtrl.text.trim(),
-      seuilAlerte: double.tryParse(_seuilAlerteCtrl.text.replaceAll(',', '.').trim()) ?? 2.0,
-      coutUnitaire: double.tryParse(_coutUnitaireCtrl.text.replaceAll(',', '.').trim()) ?? 0.0,
+      seuilAlerte:
+          double.tryParse(_seuilAlerteCtrl.text.replaceAll(',', '.').trim()) ??
+              2.0,
+      coutUnitaire:
+          double.tryParse(_coutUnitaireCtrl.text.replaceAll(',', '.').trim()) ??
+              0.0,
       updatedAt: DateTime.now(),
     );
 
@@ -117,9 +125,11 @@ class _StockFormScreenState extends State<StockFormScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error), backgroundColor: Colors.red));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Article de stock enregistré')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Article de stock enregistré')));
         Navigator.of(context).pop();
       }
     }
@@ -130,12 +140,16 @@ class _StockFormScreenState extends State<StockFormScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Supprimer l'article ?"),
-        content: const Text("Cette action retirera définitivement cet article de votre inventaire de stock."),
+        content: const Text(
+            'Cette action retirera définitivement cet article de votre inventaire de stock.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Supprimer', style: TextStyle(color: AtelierProColors.rougeAlerte)),
+            child: const Text('Supprimer',
+                style: TextStyle(color: AtelierProColors.rougeAlerte)),
           ),
         ],
       ),
@@ -143,11 +157,13 @@ class _StockFormScreenState extends State<StockFormScreen> {
 
     if (confirmed == true && widget.itemId != null && mounted) {
       setState(() => _isLoading = true);
-      final error = await context.read<StockProvider>().deleteItem(widget.itemId!);
+      final error =
+          await context.read<StockProvider>().deleteItem(widget.itemId!);
       if (mounted) {
         setState(() => _isLoading = false);
         if (error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(error), backgroundColor: Colors.red));
         } else {
           Navigator.of(context).pop();
         }
@@ -176,14 +192,17 @@ class _StockFormScreenState extends State<StockFormScreen> {
         actions: [
           if (isEdition)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AtelierProColors.rougeAlerte),
+              icon: const Icon(Icons.delete_outline,
+                  color: AtelierProColors.rougeAlerte),
               tooltip: "Supprimer l'article",
               onPressed: _isLoading ? null : _supprimer,
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AtelierProColors.terracotta))
+          ? const Center(
+              child:
+                  CircularProgressIndicator(color: AtelierProColors.terracotta))
           : Form(
               key: _formKey,
               child: ListView(
@@ -191,8 +210,11 @@ class _StockFormScreenState extends State<StockFormScreen> {
                 children: [
                   TextFormField(
                     controller: _nomCtrl,
-                    decoration: _inputDecoration('Nom de l\'article *', 'Ex: Bazin Riche Blanc, Fils noir 40/2'),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Le nom est obligatoire' : null,
+                    decoration: _inputDecoration('Nom de l\'article *',
+                        'Ex: Bazin Riche Blanc, Fils noir 40/2'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Le nom est obligatoire'
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -202,16 +224,21 @@ class _StockFormScreenState extends State<StockFormScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _categorieCtrl,
-                          decoration: _inputDecoration('Catégorie *', 'Ex: Tissus, Fils, Quincaillerie'),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'La catégorie est obligatoire' : null,
+                          decoration: _inputDecoration(
+                              'Catégorie *', 'Ex: Tissus, Fils, Quincaillerie'),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'La catégorie est obligatoire'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 8),
                       PopupMenuButton<String>(
                         icon: const Icon(Icons.arrow_drop_down),
-                        onSelected: (v) => setState(() => _categorieCtrl.text = v),
+                        onSelected: (v) =>
+                            setState(() => _categorieCtrl.text = v),
                         itemBuilder: (ctx) => _categoriesSuggerees
-                            .map((cat) => PopupMenuItem<String>(value: cat, child: Text(cat)))
+                            .map((cat) => PopupMenuItem<String>(
+                                value: cat, child: Text(cat)))
                             .toList(),
                       ),
                     ],
@@ -223,9 +250,15 @@ class _StockFormScreenState extends State<StockFormScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _quantiteCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: _inputDecoration('Quantité en stock *', 'Ex: 15.5'),
-                          validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Quantité invalide' : null,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: _inputDecoration(
+                              'Quantité en stock *', 'Ex: 15.5'),
+                          validator: (v) => (v == null ||
+                                  double.tryParse(v.replaceAll(',', '.')) ==
+                                      null)
+                              ? 'Quantité invalide'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -235,14 +268,17 @@ class _StockFormScreenState extends State<StockFormScreen> {
                             Expanded(
                               child: TextFormField(
                                 controller: _uniteCtrl,
-                                decoration: _inputDecoration('Unité de mesure', 'Ex: mètres, pièces'),
+                                decoration: _inputDecoration(
+                                    'Unité de mesure', 'Ex: mètres, pièces'),
                               ),
                             ),
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.arrow_drop_down),
-                              onSelected: (v) => setState(() => _uniteCtrl.text = v),
+                              onSelected: (v) =>
+                                  setState(() => _uniteCtrl.text = v),
                               itemBuilder: (ctx) => _unitesSuggerees
-                                  .map((unite) => PopupMenuItem<String>(value: unite, child: Text(unite)))
+                                  .map((unite) => PopupMenuItem<String>(
+                                      value: unite, child: Text(unite)))
                                   .toList(),
                             ),
                           ],
@@ -254,17 +290,26 @@ class _StockFormScreenState extends State<StockFormScreen> {
 
                   TextFormField(
                     controller: _seuilAlerteCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: _inputDecoration('Seuil d\'alerte stock faible', 'Alerte si la quantité baisse sous...'),
-                    validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Seuil invalide' : null,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _inputDecoration('Seuil d\'alerte stock faible',
+                        'Alerte si la quantité baisse sous...'),
+                    validator: (v) => (v == null ||
+                            double.tryParse(v.replaceAll(',', '.')) == null)
+                        ? 'Seuil invalide'
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
                   TextFormField(
                     controller: _coutUnitaireCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: _inputDecoration('Coût d\'achat unitaire (FCFA)', 'Ex: 4500'),
-                    validator: (v) => (v == null || double.tryParse(v.replaceAll(',', '.')) == null) ? 'Montant invalide' : null,
+                    decoration: _inputDecoration(
+                        'Coût d\'achat unitaire (FCFA)', 'Ex: 4500'),
+                    validator: (v) => (v == null ||
+                            double.tryParse(v.replaceAll(',', '.')) == null)
+                        ? 'Montant invalide'
+                        : null,
                   ),
                   const SizedBox(height: 32),
 
@@ -274,11 +319,15 @@ class _StockFormScreenState extends State<StockFormScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: AtelierProColors.terracotta,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                     child: Text(
-                      isEdition ? 'Mettre à jour l\'article' : 'Enregistrer au stock',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      isEdition
+                          ? 'Mettre à jour l\'article'
+                          : 'Enregistrer au stock',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -295,9 +344,15 @@ class _StockFormScreenState extends State<StockFormScreen> {
       fillColor: AtelierProColors.surfaceContainer,
       labelStyle: const TextStyle(color: AtelierProColors.onSurfaceVariant),
       hintStyle: const TextStyle(color: AtelierProColors.onSurfaceVariant),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AtelierProColors.outlineVariant)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AtelierProColors.outlineVariant)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AtelierProColors.terracotta)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AtelierProColors.outlineVariant)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AtelierProColors.outlineVariant)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AtelierProColors.terracotta)),
     );
   }
 }

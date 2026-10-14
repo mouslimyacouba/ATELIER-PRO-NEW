@@ -50,10 +50,11 @@ class OrdersProvider extends ChangeNotifier {
   void _updateOrdersCaches() {
     // Recalcul du chiffre d'affaires total
     _cachedChiffreAffairesTotal =
-        _orders.fold(0, (sum, o) => sum + o.prixTotal);
+        _orders.fold(0, (total, o) => total + o.prixTotal);
 
     // Recalcul du montant restant dû
-    _cachedMontantRestantDu = _orders.fold(0, (sum, o) => sum + o.remaining);
+    _cachedMontantRestantDu =
+        _orders.fold(0, (total, o) => total + o.remaining);
 
     // Recalcul des commandes en retard
     final today = DateTime.now();

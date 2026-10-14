@@ -251,11 +251,11 @@ class AtelierProTheme {
         labelStyle: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600, color: isLight ? AtelierProColors.onSurfaceVariant : AtelierProColors.onSurfaceVariantDark),
         hintStyle: GoogleFonts.plusJakartaSans(fontSize: 14, color: isLight ? AtelierProColors.onSurfaceMuted : AtelierProColors.onSurfaceMutedDark),
       ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AtelierProColors.secondaryContainer,
         foregroundColor: Colors.white,
         elevation: 4,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(9999))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(9999))),
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

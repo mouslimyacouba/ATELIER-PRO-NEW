@@ -84,7 +84,7 @@ class ModelesScreen extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
+                        side: const BorderSide(
                           color: AtelierProColors.outlineVariant,
                         ),
                       ),

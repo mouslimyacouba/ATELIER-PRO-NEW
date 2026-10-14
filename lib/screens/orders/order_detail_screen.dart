@@ -172,7 +172,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: method,
+                  initialValue: method,
                   decoration:
                       const InputDecoration(labelText: 'Mode de paiement'),
                   items: AtelierPayment.modeLabels.entries
@@ -265,7 +265,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       AtelierOrder order, AtelierClient? client) async {
     if (client?.telephone == null ||
         client!.telephone!.trim().isEmpty ||
-        order.dateEcheance == null) return;
+        order.dateEcheance == null) {
+      return;
+    }
     final atelier = context.read<AtelierProvider>().atelier;
     final message =
         'Bonjour ${client.nomComplet}, votre commande "${order.description}" chez '
@@ -462,7 +464,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(client?.nomComplet ?? 'Client',
-              style: TextStyle(color: AtelierProColors.onSurfaceVariant)),
+              style: const TextStyle(color: AtelierProColors.onSurfaceVariant)),
           if (order.dateEcheance != null) ...[
             const SizedBox(height: 4),
             Text(

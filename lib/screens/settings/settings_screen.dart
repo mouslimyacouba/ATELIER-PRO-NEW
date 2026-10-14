@@ -35,20 +35,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadVersion() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      if (mounted)
+      if (mounted) {
         setState(() => _appVersion = '${info.version} (${info.buildNumber})');
+      }
     } catch (_) {
       // Pas bloquant si indisponible (ex: web debug).
     }
   }
 
   Future<void> _changeLogo() async {
+    final atelierProvider = context.read<AtelierProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     final file = await StorageService.pickImage();
-    if (file == null) return;
+    if (!mounted || file == null) return;
 
     setState(() => _uploadingLogo = true);
     try {
-      final atelier = context.read<AtelierProvider>().atelier;
+      final atelier = atelierProvider.atelier;
       if (atelier == null) return;
       final url = await StorageService.upload(
         bucket: 'logos',
@@ -56,14 +59,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         key: 'logo',
         file: file,
       );
-      final error = await context.read<AtelierProvider>().updateLogo(url);
+      final error = await atelierProvider.updateLogo(url);
       if (mounted && error != null) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error)));
+        messenger.showSnackBar(SnackBar(content: Text(error)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Échec de l\'envoi : $e')),
         );
       }
@@ -122,8 +124,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return null;
                     final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-                    if (digits.length != 8)
+                    if (digits.length != 8) {
                       return 'Le numéro doit avoir 8 chiffres';
+                    }
                     return null;
                   },
                 ),

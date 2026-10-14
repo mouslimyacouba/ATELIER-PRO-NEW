@@ -22,8 +22,8 @@ jobs:
         with:
           channel: stable
 
-      - name: Create placeholder environment file
-        run: touch .env
+      - name: Create CI environment file
+        run: cp .env.example .env
 
       - name: Install dependencies
         run: flutter pub get

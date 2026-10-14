@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -163,8 +162,9 @@ class AuthProvider extends ChangeNotifier {
     if (!_attemptGuard.isLocked) return null;
     final seconds = _attemptGuard.remaining.inSeconds;
     if (seconds <= 0) return null;
-    if (seconds < 60)
+    if (seconds < 60) {
       return 'Trop de tentatives. Réessaie dans $seconds secondes.';
+    }
     final minutes = (seconds / 60).ceil();
     return 'Trop de tentatives. Réessaie dans $minutes minute${minutes > 1 ? 's' : ''}.';
   }

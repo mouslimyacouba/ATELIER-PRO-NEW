@@ -249,7 +249,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'AtelierPro',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
@@ -480,10 +480,10 @@ class _AuthScreenState extends State<AuthScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 4),
             child: Icon(Icons.circle, size: 8, color: colors.tertiary),
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               "Connexion protégée. Après plusieurs essais échoués, l'accès est suspendu quelques minutes pour protéger votre compte.",
@@ -547,7 +547,7 @@ class _AuthScreenState extends State<AuthScreen> {
             if (_isSignUp) {
               final error =
                   PasswordPolicy.validate(value, email: _emailCtrl.text.trim());
-              return error ?? null;
+              return error;
             }
             return null;
           },
@@ -594,7 +594,7 @@ class _AuthScreenState extends State<AuthScreen> {
           _buildPolicyConsent(),
           if (!_acceptedPolicies)
             Padding(
-              padding: EdgeInsets.only(left: 12, top: 2),
+              padding: const EdgeInsets.only(left: 12, top: 2),
               child: Text(
                 'Cochez la case pour créer votre compte.',
                 style: TextStyle(
