@@ -13,9 +13,10 @@ ios/Runner/GoogleService-Info.plist
 .pub-cache/
 .pub/
 build/
-*.lock
+coverage/
 
 # Android
+local.properties
 android/**/gradle-wrapper.jar
 android/.gradle
 android/captures/

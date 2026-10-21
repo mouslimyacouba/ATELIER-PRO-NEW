@@ -30,44 +30,38 @@ String _matchBlock(String rules, String collection, String param) {
 
 void main() {
   group('Firestore security rules contract', () {
-    late String rootRules;
-    late String firebaseRules;
+    late String rules;
 
     setUpAll(() {
-      rootRules = _readRules('firestore.rules');
-      firebaseRules = _readRules('firebase/firestore.rules');
-    });
-
-    test('the deployable and documented rule files stay synchronized', () {
-      expect(firebaseRules, rootRules);
+      rules = _readRules('firebase/firestore.rules');
     });
 
     test(
         'default deny stays in place and nothing is open to any signed-in user',
         () {
       expect(
-        rootRules,
+        rules,
         contains('match /{document=**} {\n      allow read, write: if false;'),
       );
-      expect(rootRules,
+      expect(rules,
           isNot(contains('allow read, write: if request.auth != null;')));
     });
 
     test('server side requires a verified identity', () {
-      expect(rootRules, contains('request.auth.token.email_verified == true'));
-      expect(rootRules,
+      expect(rules, contains('request.auth.token.email_verified == true'));
+      expect(rules,
           contains("request.auth.token.firebase.sign_in_provider == 'phone'"));
     });
 
     test(
         'firestore rules enforce non-negative validation for orders, payments and stock',
         () {
-      expect(rootRules, contains('function isValidOrder(data)'));
-      expect(rootRules, contains('function isValidPayment(data)'));
-      expect(rootRules, contains('function isValidStock(data)'));
-      expect(rootRules, contains('data.prixTotal >= 0'));
-      expect(rootRules, contains('data.montant > 0'));
-      expect(rootRules, contains('data.quantite >= 0'));
+      expect(rules, contains('function isValidOrder(data)'));
+      expect(rules, contains('function isValidPayment(data)'));
+      expect(rules, contains('function isValidStock(data)'));
+      expect(rules, contains('data.prixTotal >= 0'));
+      expect(rules, contains('data.montant > 0'));
+      expect(rules, contains('data.quantite >= 0'));
     });
 
     test('every user-owned collection has owner checks and a validator', () {
@@ -81,7 +75,7 @@ void main() {
         'historique_modifications': 'isValidHistorique',
       };
       validators.forEach((collection, validator) {
-        final block = _matchBlock(rootRules, collection, '{docId}');
+        final block = _matchBlock(rules, collection, '{docId}');
         expect(
             block, contains('allow read, delete: if isOwner(resource.data);'),
             reason: collection);
@@ -110,7 +104,7 @@ void main() {
         'compteurs': 'isValidCompteur',
       };
       validators.forEach((collection, validator) {
-        final block = _matchBlock(rootRules, collection, '{userId}');
+        final block = _matchBlock(rules, collection, '{userId}');
         expect(
             block,
             contains('allow read, delete: if isSignedIn() && '
@@ -131,11 +125,11 @@ void main() {
     });
 
     test('atelier métier can be set on creation but not changed later', () {
-      final block = _matchBlock(rootRules, 'ateliers', '{userId}');
+      final block = _matchBlock(rules, 'ateliers', '{userId}');
       expect(block, contains('allow create: if isSignedIn()'));
-      expect(rootRules, contains('function isMetierUnchanged()'));
+      expect(rules, contains('function isMetierUnchanged()'));
       expect(
-        rootRules,
+        rules,
         contains(
           "resource.data.get('specialite', null) == null\n"
           "        || request.resource.data.get('specialite', null) == resource.data.specialite;",
@@ -153,40 +147,34 @@ void main() {
   });
 
   group('Storage security rules contract', () {
-    late String rootRules;
-    late String firebaseRules;
+    late String rules;
 
     setUpAll(() {
-      rootRules = _readRules('storage.rules');
-      firebaseRules = _readRules('firebase/storage.rules');
-    });
-
-    test('the deployable and documented rule files stay synchronized', () {
-      expect(firebaseRules, rootRules);
+      rules = _readRules('firebase/storage.rules');
     });
 
     test('uploads are limited to small images and a verified identity', () {
-      expect(rootRules, contains('5 * 1024 * 1024'));
+      expect(rules, contains('5 * 1024 * 1024'));
       expect(
-          rootRules,
+          rules,
           contains(
               "request.resource.contentType.matches('image/(jpeg|png|webp)')"));
-      expect(rootRules, contains('request.auth.token.email_verified == true'));
+      expect(rules, contains('request.auth.token.email_verified == true'));
     });
 
     test('logos stay public while workshop data stays owner-only', () {
-      expect(rootRules, contains('match /logos/{userId}/{fileName}'));
-      expect(rootRules, contains('allow read: if true; // logos publics'));
+      expect(rules, contains('match /logos/{userId}/{fileName}'));
+      expect(rules, contains('allow read: if true; // logos publics'));
 
       for (final folder in ['photos', 'commandes', 'modeles_etapes']) {
-        expect(rootRules, contains('match /$folder/{userId}/{fileName}'));
-        expect(rootRules, contains('allow read: if isOwner(userId);'));
+        expect(rules, contains('match /$folder/{userId}/{fileName}'));
+        expect(rules, contains('allow read: if isOwner(userId);'));
         expect(
-          rootRules,
+          rules,
           contains(
               'allow create, update: if isOwner(userId) && isValidUpload();'),
         );
-        expect(rootRules, contains('allow delete: if isOwner(userId);'));
+        expect(rules, contains('allow delete: if isOwner(userId);'));
       }
     });
   });
